@@ -3,7 +3,6 @@ set -e
 
 SUBFINDER_VERSION="2.8.0"
 
-# Create bin directory if not present
 mkdir -p bin
 
 echo "Downloading Subfinder v${SUBFINDER_VERSION}..."
