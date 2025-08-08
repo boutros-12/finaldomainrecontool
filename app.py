@@ -80,7 +80,7 @@ def abuseipdb_lookup(ip):
 # === Subfinder Subdomain Enumeration ===
 def subfinder_scan(domain):
     try:
-        cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
+        cmd = f"./bin/subfinder -d {shlex.quote(domain)} -silent -oJ -"
         process = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=60)
         if process.returncode != 0:
             return {"error": process.stderr.strip()}
