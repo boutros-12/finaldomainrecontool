@@ -1,3 +1,4 @@
+import os
 import dns.resolver
 import requests
 import subprocess
@@ -7,12 +8,12 @@ from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
-# === API Keys ===
-VIEWDNS_API_KEY = "622f5851adaccc39c603cd9afdd6a6f791ae2b08"  
-IPINFO_TOKEN = "502b0e42f05a1c"
-ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
+# === API Keys from environment variables ===
+VIEWDNS_API_KEY = os.getenv("VIEWDNS_API_KEY", "622f5851adaccc39c603cd9afdd6a6f791ae2b08")
+IPINFO_TOKEN = os.getenv("IPINFO_TOKEN", "502b0e42f05a1c")
+ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY", "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36")
 
-# === DNS Helpers ===
+# === DNS Helper Functions ===
 def resolve_domain_to_ips(domain):
     ips = []
     try:
@@ -46,7 +47,7 @@ def get_dkim_selectors(domain):
             found[sel] = txts
     return found
 
-# === External APIs ===
+# === External API Query Functions ===
 def viewdns_dnsrecord(domain):
     try:
         url = f"http://pro.viewdns.info/dnsrecord/?domain={domain}&apikey={VIEWDNS_API_KEY}&output=json"
@@ -76,7 +77,7 @@ def abuseipdb_lookup(ip):
     except Exception as e:
         return {"error": f"AbuseIPDB error: {str(e)}"}
 
-# === Subfinder Integration ===
+# === Subfinder Subdomain Enumeration ===
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
@@ -97,6 +98,7 @@ def subfinder_scan(domain):
         return {"error": str(e)}
 
 # === Flask Routes ===
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -145,4 +147,5 @@ def api_subdomain_scan():
     return jsonify(subfinder_scan(domain))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
