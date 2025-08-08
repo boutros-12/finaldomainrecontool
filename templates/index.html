@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Domain Reconnaissance Tool</title>
+<style>
+  body {
+    font-family: Arial;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  input {
+    width: 65%;
+    padding: 10px;
+    font-size: 16px;
+  }
+  button {
+    padding: 11px 18px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  pre {
+    background: #f4f4f4;
+    border: 1px solid #ccc;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin-top: 10px;
+  }
+  .error {
+    color: red;
+    margin-top: 10px;
+  }
+  .loading {
+    font-style: italic;
+    margin-top: 10px;
+    display: none;
+    color: #555;
+  }
+  .low-risk { color: green; font-weight: bold; }
+  .medium-risk { color: orange; font-weight: bold; }
+  .high-risk { color: red; font-weight: bold; }
+  h3 {
+    margin-top: 40px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Domain Reconnaissance Tool</h1>
+
+<!-- DOMAIN LOOKUP -->
+<h3>Domain Lookup</h3>
+<input id="domainInput" placeholder="example.com" />
+<button onclick="runRecon()">Run Recon</button>
+<div id="loading" class="loading">Loading...</div>
+<div id="output"></div>
+<div id="error" class="error"></div>
+
+<hr />
+
+<!-- IPINFO -->
+<h3>IP Lookup (IPinfo)</h3>
+<input id="ipinfoInput" placeholder="8.8.8.8" />
+<button onclick="runIpinfo()">Lookup IPinfo</button>
+<div id="loadingIpinfo" class="loading">Loading...</div>
+<div id="outputIpinfo"></div>
+<div id="errorIpinfo" class="error"></div>
+
+<hr />
+
+<!-- ABUSEIPDB -->
+<h3>IP Reputation (AbuseIPDB)</h3>
+<input id="abuseIpInput" placeholder="8.8.8.8" />
+<button onclick="runAbuseIPDB()">Check Abuse</button>
+<div id="loadingAbuse" class="loading">Loading...</div>
+<div id="outputAbuse"></div>
+<div id="errorAbuse" class="error"></div>
+
+<hr />
+
+<!-- SUBDOMAIN ENUMERATION -->
+<h3>Subdomain Enumeration (Subfinder)</h3>
+<input id="subfinderDomainInput" placeholder="example.com" />
+<button onclick="runSubfinder()">Find Subdomains</button>
+<div id="loadingSubfinder" class="loading">Scanning...</div>
+<div id="outputSubfinder"></div>
+<div id="errorSubfinder" class="error"></div>
+
+<script>
+function validateIPv4(ip) {
+  const re = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+  return re.test(ip);
+}
+
+async function runRecon() {
+  const val = domainInput.value.trim();
+  output.innerHTML = ''; error.textContent = '';
+  if (!val) return error.textContent = 'Enter a domain.';
+  loading.style.display = 'block';
+  try {
+    const r = await fetch(`/api/recon?domain=${encodeURIComponent(val)}`);
+    loading.style.display = 'none';
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    output.innerHTML = `<pre>${JSON.stringify(await r.json(), null, 2)}</pre>`;
+  } catch (e) { loading.style.display = 'none'; error.textContent = e.message; }
+}
+
+async function runIpinfo() {
+  const ip = ipinfoInput.value.trim();
+  outputIpinfo.innerHTML = ''; errorIpinfo.textContent = '';
+  if (!ip) return errorIpinfo.textContent = 'Enter IP';
+  if (!validateIPv4(ip)) return errorIpinfo.textContent = 'Invalid IPv4';
+  loadingIpinfo.style.display = 'block';
+  try {
+    const r = await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
+    loadingIpinfo.style.display = 'none';
+    const data = await r.json();
+    if (data.error) return errorIpinfo.textContent = data.error;
+    outputIpinfo.innerHTML = `
+      <strong>IP:</strong> ${data.ip || ''}<br>
+      <strong>Location:</strong> ${data.city || ''}, ${data.region || ''}, ${data.country || ''}<br>
+      <strong>Org:</strong> ${data.org || ''}<br>
+      <strong>Coordinates:</strong> ${data.loc || ''}<br>
+      <strong>Timezone:</strong> ${data.timezone || ''}<br>
+      <strong>Anycast:</strong> ${data.anycast ? 'Yes' : 'No'}
+    `;
+  } catch (e) { loadingIpinfo.style.display = 'none'; errorIpinfo.textContent = e.message; }
+}
+
+async function runAbuseIPDB() {
+  const ip = abuseIpInput.value.trim();
+  outputAbuse.innerHTML = ''; errorAbuse.textContent = '';
+  if (!ip) return errorAbuse.textContent = 'Enter IP';
+  if (!validateIPv4(ip)) return errorAbuse.textContent = 'Invalid IPv4';
+  loadingAbuse.style.display = 'block';
+  try {
+    const r = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
+    loadingAbuse.style.display = 'none';
+    const data = await r.json();
+    if (data.error) return errorAbuse.textContent = data.error;
+    const d = data.data || {};
+    const score = d.abuseConfidenceScore || 0;
+    let cls = 'low-risk', label = 'Low';
+    if (score >= 70) { cls = 'high-risk'; label = 'High'; }
+    else if (score >= 30) { cls = 'medium-risk'; label = 'Medium'; }
+    outputAbuse.innerHTML = `
+      <strong>IP:</strong> ${d.ipAddress || ip}<br>
+      <strong>Score:</strong> <span class="${cls}">${score} (${label} risk)</span><br>
+      <strong>Reports:</strong> ${d.totalReports || 0}<br>
+      <strong>Last Report:</strong> ${d.lastReportedAt || 'N/A'}<br>
+      <strong>Categories:</strong> ${(d.categories || []).join(', ') || 'None'}<br>
+      <a href="https://www.abuseipdb.com/check/${ip}" target="_blank">View on AbuseIPDB</a>
+    `;
+  } catch (e) { loadingAbuse.style.display = 'none'; errorAbuse.textContent = e.message; }
+}
+
+async function runSubfinder() {
+  const dom = subfinderDomainInput.value.trim();
+  outputSubfinder.innerHTML = ''; errorSubfinder.textContent = '';
+  if (!dom) return errorSubfinder.textContent = 'Enter domain';
+  loadingSubfinder.style.display = 'block';
+  try {
+    const r = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
+    loadingSubfinder.style.display = 'none';
+    const data = await r.json();
+    if (data.error) return errorSubfinder.textContent = data.error;
+    if (data.subdomains && data.subdomains.length) {
+      outputSubfinder.innerHTML = `<ul>${data.subdomains.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    } else {
+      outputSubfinder.textContent = 'No subdomains found.';
+    }
+  } catch (e) { loadingSubfinder.style.display = 'none'; errorSubfinder.textContent = e.message; }
+}
+</script>
+
+</body>
+</html>
