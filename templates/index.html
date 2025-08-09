@@ -13,23 +13,9 @@
   h3 { margin-top: 40px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
   .copy-btn { font-size: 12px; padding: 3px 6px; background: #eee; border: none; cursor: pointer; }
   @media(max-width: 600px) { input { width: 100%; margin-bottom: 8px; } button { width: 100%; margin-top: 5px; } }
-
-  /* New output styling */
-  .output-box {
-    background: #f4f4f4;
-    border: 1px solid #ccc;
-    padding: 12px;
-    margin-top: 10px;
-    max-width: 100%;
-    max-height: 400px;     /* limit vertical size */
-    overflow: auto;        /* scroll if needed */
-    box-sizing: border-box;
-  }
-  .output-box pre {
-    margin: 0;
-    white-space: pre-wrap; /* preserve formatting but wrap long lines */
-    word-break: break-word;
-  }
+  .output-box { background: #f4f4f4; border: 1px solid #ccc; padding: 12px; margin-top: 10px;
+    max-width: 100%; max-height: 400px; overflow: auto; box-sizing: border-box; }
+  .output-box pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -37,12 +23,12 @@
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup</h3>
-<small>Gets DNS, SPF, DKIM, DMARC, and other records</small><br/>
+<small>Gets DNS, SPF, DKIM, DMARC, WHOIS, SSL, DNSSEC, HTTP headers</small><br/>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
 <button onclick="runRecon()">Run Recon</button>
 <div id="loading" class="loading">Loading...</div>
-<div id="output"></div>
 <div id="error" class="error"></div>
+<div id="output"></div>
 <hr/>
 
 <h3>IP Lookup (IPinfo)</h3>
@@ -50,8 +36,8 @@
 <input id="ipinfoInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runIpinfo()" />
 <button onclick="runIpinfo()">Lookup IPinfo</button>
 <div id="loadingIpinfo" class="loading">Loading...</div>
-<div id="outputIpinfo"></div>
 <div id="errorIpinfo" class="error"></div>
+<div id="outputIpinfo"></div>
 <hr/>
 
 <h3>IP Reputation (AbuseIPDB)</h3>
@@ -59,8 +45,8 @@
 <input id="abuseIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runAbuseIPDB()" />
 <button onclick="runAbuseIPDB()">Check Abuse</button>
 <div id="loadingAbuse" class="loading">Loading...</div>
-<div id="outputAbuse"></div>
 <div id="errorAbuse" class="error"></div>
+<div id="outputAbuse"></div>
 <hr/>
 
 <h3>Subdomain Enumeration (Subfinder)</h3>
@@ -68,80 +54,58 @@
 <input id="subfinderDomainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runSubfinder()" />
 <button onclick="runSubfinder()">Find Subdomains</button>
 <div id="loadingSubfinder" class="loading">Scanning...</div>
-<div id="outputSubfinder"></div>
 <div id="errorSubfinder" class="error"></div>
+<div id="outputSubfinder"></div>
+<hr/>
 
 <script>
-function validateDomain(name) {
-  return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(name);
-}
-function validateIPv4(ip) {
-  return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);
-}
-function copyOutput(id) {
-  const text = document.getElementById(id).innerText;
-  navigator.clipboard.writeText(text);
-  alert("Copied to clipboard!");
+function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
+function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
+function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied to clipboard!");}
+
+async function runRecon(){
+  error.textContent=''; output.innerHTML=''; loading.style.display='block';
+  const v=domainInput.value.trim(); if(!validateDomain(v)) return error.textContent='Invalid domain';
+  try{
+    const r=await fetch(`/api/recon?domain=${encodeURIComponent(v)}`);
+    loading.style.display='none'; const d=await r.json();
+    if(d.WHOIS && d.WHOIS.formatted_text) { d.WHOIS.formatted_text = d.WHOIS.formatted_text; }
+    output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
+    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loading.style.display='none'; error.textContent=e;}
 }
 
-async function runRecon() {
-  const val = domainInput.value.trim();
-  output.innerHTML = ''; error.textContent = '';
-  if (!validateDomain(val)) return error.textContent = 'Invalid domain';
-  loading.style.display = 'block';
-  try {
-    const r = await fetch(`/api/recon?domain=${encodeURIComponent(val)}`);
-    loading.style.display = 'none';
-    const data = await r.json();
-    if (data.error) return error.textContent = data.error;
-    output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch (e) { loading.style.display = 'none'; error.textContent = e.message; }
+async function runIpinfo(){
+  errorIpinfo.textContent=''; outputIpinfo.innerHTML=''; loadingIpinfo.style.display='block';
+  const ip=ipinfoInput.value.trim(); if(!validateIPv4(ip)) return errorIpinfo.textContent='Invalid IPv4';
+  try{
+    const r=await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
+    loadingIpinfo.style.display='none'; const d=await r.json();
+    outputIpinfo.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
+    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingIpinfo.style.display='none'; errorIpinfo.textContent=e;}
 }
 
-async function runIpinfo() {
-  const ip = ipinfoInput.value.trim();
-  outputIpinfo.innerHTML = ''; errorIpinfo.textContent = '';
-  if (!validateIPv4(ip)) return errorIpinfo.textContent = 'Invalid IPv4';
-  loadingIpinfo.style.display = 'block';
-  try {
-    const r = await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
-    loadingIpinfo.style.display = 'none';
-    const data = await r.json();
-    if (data.error) return errorIpinfo.textContent = data.error;
-    outputIpinfo.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch (e) { loadingIpinfo.style.display = 'none'; errorIpinfo.textContent = e.message; }
+async function runAbuseIPDB(){
+  errorAbuse.textContent=''; outputAbuse.innerHTML=''; loadingAbuse.style.display='block';
+  const ip=abuseIpInput.value.trim(); if(!validateIPv4(ip)) return errorAbuse.textContent='Invalid IPv4';
+  try{
+    const r=await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
+    loadingAbuse.style.display='none'; const d=await r.json();
+    outputAbuse.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
+    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingAbuse.style.display='none'; errorAbuse.textContent=e;}
 }
 
-async function runAbuseIPDB() {
-  const ip = abuseIpInput.value.trim();
-  outputAbuse.innerHTML = ''; errorAbuse.textContent = '';
-  if (!validateIPv4(ip)) return errorAbuse.textContent = 'Invalid IPv4';
-  loadingAbuse.style.display = 'block';
-  try {
-    const r = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
-    loadingAbuse.style.display = 'none';
-    const data = await r.json();
-    if (data.error) return errorAbuse.textContent = data.error;
-    outputAbuse.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch (e) { loadingAbuse.style.display = 'none'; errorAbuse.textContent = e.message; }
-}
-
-async function runSubfinder() {
-  const dom = subfinderDomainInput.value.trim();
-  outputSubfinder.innerHTML = ''; errorSubfinder.textContent = '';
-  if (!validateDomain(dom)) return errorSubfinder.textContent = 'Invalid domain';
-  loadingSubfinder.style.display = 'block';
-  try {
-    const r = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
-    loadingSubfinder.style.display = 'none';
-    const data = await r.json();
-    if (data.error) return errorSubfinder.textContent = data.error;
-    outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch (e) { loadingSubfinder.style.display = 'none'; errorSubfinder.textContent = e.message; }
+async function runSubfinder(){
+  errorSubfinder.textContent=''; outputSubfinder.innerHTML=''; loadingSubfinder.style.display='block';
+  const dom=subfinderDomainInput.value.trim(); if(!validateDomain(dom)) return errorSubfinder.textContent='Invalid domain';
+  try{
+    const r=await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
+    loadingSubfinder.style.display='none'; const d=await r.json();
+    outputSubfinder.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
+    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingSubfinder.style.display='none'; errorSubfinder.textContent=e;}
 }
 </script>
 </body>
