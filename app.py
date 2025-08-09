@@ -7,35 +7,28 @@ import whois
 import threading
 import socket
 import ssl
+import time
 from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
 # === API Keys ===
 VIEWDNS_API_KEY = "YOUR_VIEWDNS_KEY"
-IPINFO_TOKEN = "502b0e42f05a1c"
+IPINFO_TOKEN = "502b0e42f05a1c"  # Your token
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
 
-# === DNS Helpers ===
+# ===== DNS Functions =====
 def resolve_domain_to_ips(domain):
-    ips = []
     try:
-        answers = dns.resolver.resolve(domain, 'A')
-        for rdata in answers:
-            ips.append(rdata.to_text())
+        return [rdata.to_text() for rdata in dns.resolver.resolve(domain, 'A')]
     except Exception:
-        pass
-    return ips
+        return []
 
 def get_dns_records(domain, record_type):
-    records = []
     try:
-        answers = dns.resolver.resolve(domain, record_type)
-        for rdata in answers:
-            records.append(rdata.to_text())
+        return [rdata.to_text() for rdata in dns.resolver.resolve(domain, record_type)]
     except Exception:
-        pass
-    return records
+        return []
 
 def get_txt_records(domain):
     return get_dns_records(domain, 'TXT')
@@ -44,59 +37,59 @@ def get_dkim_selectors(domain):
     selectors = ['default', 'selector1', 'google', 'mail', 'smtp']
     found = {}
     for sel in selectors:
-        dkim_domain = f"{sel}._domainkey.{domain}"
-        txts = get_txt_records(dkim_domain)
+        txts = get_txt_records(f"{sel}._domainkey.{domain}")
         if txts:
             found[sel] = txts
     return found
 
-# === External APIs ===
+# ===== External API Functions =====
 def viewdns_dnsrecord(domain):
     try:
         url = f"http://pro.viewdns.info/dnsrecord/?domain={domain}&apikey={VIEWDNS_API_KEY}&output=json"
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json()
     except Exception as e:
-        return {"error": f"ViewDNS error: {str(e)}"}
+        return {"error": str(e)}
 
 def ipinfo_ip_lookup(ip):
-    try:
-        url = f"https://ipinfo.io/{ip}/json?token={IPINFO_TOKEN}"
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        return {"error": f"IPinfo error: {str(e)}"}
+    url = f"https://ipinfo.io/{ip}/json?token={IPINFO_TOKEN}"
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, timeout=(5, 5))  # Separate connect & read timeouts
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.Timeout:
+            time.sleep(1)
+        except Exception as e:
+            return {"error": f"IPinfo error: {str(e)}"}
+    return {"error": "IPinfo timed out after 3 attempts"}
 
 def abuseipdb_lookup(ip):
     try:
         url = "https://api.abuseipdb.com/api/v2/check"
-        query = {"ipAddress": ip, "maxAgeInDays": "90"}
+        params = {"ipAddress": ip, "maxAgeInDays": "90"}
         headers = {"Accept": "application/json", "Key": ABUSEIPDB_API_KEY}
-        resp = requests.get(url, headers=headers, params=query, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
     except Exception as e:
-        return {"error": f"AbuseIPDB error: {str(e)}"}
+        return {"error": str(e)}
 
-# === WHOIS Integration ===
+# ===== WHOIS =====
 def whois_lookup(domain):
     try:
-        w = whois.whois(domain)
-        return w.__dict__
+        return whois.whois(domain).__dict__
     except Exception as e:
-        return {"error": f"WHOIS error: {str(e)}"}
+        return {"error": str(e)}
 
-# === SSL Certificate fetch ===
+# ===== SSL Certificate Info =====
 def get_ssl_info(domain):
-    host = domain
-    if ':' in host:
-        host, port = host.split(':', 1)
-    else:
-        port = 443
-    ctx = ssl.create_default_context()
     try:
+        host, port = domain, 443
+        if ':' in host:
+            host, port = host.split(':', 1)
+        ctx = ssl.create_default_context()
         with socket.create_connection((host, int(port)), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert = ssock.getpeercert()
@@ -108,57 +101,56 @@ def get_ssl_info(domain):
                     "serialNumber": cert.get('serialNumber', '')
                 }
     except Exception as e:
-        return {"error": f"SSL error: {str(e)}"}
+        return {"error": str(e)}
 
-# === DNSSEC status ===
+# ===== DNSSEC =====
 def get_dnssec_status(domain):
     try:
-        answers = dns.resolver.resolve(domain, 'DNSKEY')
-        return "DNSSEC enabled" if answers else "No DNSSEC records"
+        if dns.resolver.resolve(domain, 'DNSKEY'):
+            return "DNSSEC enabled"
     except dns.resolver.NoAnswer:
         return "No DNSSEC records"
     except Exception as e:
         return f"DNSSEC check error: {str(e)}"
+    return "No DNSSEC records"
 
-# === HTTP headers ===
+# ===== HTTP Headers =====
 def fetch_http_headers(domain):
     try:
-        url = f"https://{domain}"
-        r = requests.head(url, timeout=10, allow_redirects=True)
+        r = requests.head(f"https://{domain}", timeout=10, allow_redirects=True)
         return dict(r.headers)
     except Exception as e:
-        return {"error": f"HTTP headers error: {str(e)}"}
+        return {"error": str(e)}
 
-# === Subfinder Integration ===
+# ===== Subfinder Integration =====
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
-        process = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=60)
-        if process.returncode != 0:
-            return {"error": process.stderr.strip()}
+        p = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=60)
+        if p.returncode != 0:
+            return {"error": p.stderr.strip()}
         subs = []
-        for line in process.stdout.splitlines():
+        for line in p.stdout.splitlines():
             if line.strip():
                 data = json.loads(line)
                 if "host" in data:
                     subs.append(data["host"])
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
-        return {"error": "Subfinder scan timed out."}
+        return {"error": "Subfinder scan timed out"}
     except Exception as e:
         return {"error": str(e)}
 
-# === Threaded Port Scanner with Longer Banner Timeout ===
+# ===== Port Scanner with Banners =====
 def threaded_port_scan(ip, ports="1-1024", timeout=0.6, max_threads=200):
-    port_list = []
     try:
         if '-' in ports:
             start, end = ports.split('-')
-            port_list = list(range(int(start), int(end) + 1))
+            port_list = range(int(start), int(end) + 1)
         else:
             port_list = [int(p.strip()) for p in ports.split(',') if p.strip().isdigit()]
     except:
-        port_list = [int(ports)]
+        return {"error": "Invalid port format"}
 
     open_ports = []
     lock = threading.Lock()
@@ -166,60 +158,52 @@ def threaded_port_scan(ip, ports="1-1024", timeout=0.6, max_threads=200):
     def scan_port(port):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                # Connection timeout
                 sock.settimeout(timeout)
-                result = sock.connect_ex((ip, port))
-                if result == 0:
-                    # Try grabbing banner (now 3s timeout)
-                    banner = ""
+                if sock.connect_ex((ip, port)) == 0:
+                    banner = "No banner"
                     try:
-                        sock.settimeout(3)  # increased timeout
+                        sock.settimeout(3)  # longer for banner grab
                         data = sock.recv(1024)
                         if data:
-                            banner = data.decode(errors='ignore').strip()
+                            banner = data.decode(errors="ignore").strip()
                     except:
                         pass
                     with lock:
-                        open_ports.append({"port": port, "banner": banner or "No banner"})
+                        open_ports.append({"port": port, "banner": banner})
         except:
             pass
 
     threads = []
     for port in port_list:
         t = threading.Thread(target=scan_port, args=(port,))
-        threads.append(t)
         t.start()
+        threads.append(t)
         if len(threads) >= max_threads:
-            for tt in threads:
-                tt.join()
+            for tt in threads: tt.join()
             threads = []
-
-    for tt in threads:
-        tt.join()
+    for tt in threads: tt.join()
 
     return {"ip": ip, "open_ports": sorted(open_ports, key=lambda x: x["port"])}
 
-# === Thread wrapper for heavy functions ===
+# ===== Thread Helper =====
 def threaded(fn):
     def wrapper(*args, **kwargs):
         result = {}
-        def run():
-            try:
-                result["data"] = fn(*args, **kwargs)
-            except Exception as e:
-                result["data"] = {"error": str(e)}
+        def run(): 
+            try: result['data'] = fn(*args, **kwargs)
+            except Exception as e: result['data'] = {"error": str(e)}
         t = threading.Thread(target=run)
         t.daemon = True
         t.start()
         t.join(timeout=55)
-        return result.get("data", {"error": "Timed out."})
+        return result.get('data', {"error": "Timed out"})
     return wrapper
 
 threaded_whois = threaded(whois_lookup)
 threaded_subfinder = threaded(subfinder_scan)
 threaded_portscan = threaded(threaded_port_scan)
 
-# === Flask Routes ===
+# ===== Routes =====
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -229,12 +213,12 @@ def api_recon():
     domain = request.args.get("domain")
     if not domain:
         return jsonify({"error": "Please provide a domain"}), 400
-    result = {
+    return jsonify({
         "DNS_Resolution": {"resolved_ips": resolve_domain_to_ips(domain) or "No A records"},
         "ViewDNS": viewdns_dnsrecord(domain),
-        "DNS_Records": {rtype: get_dns_records(domain, rtype) for rtype in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CAA']},
+        "DNS_Records": {r: get_dns_records(domain, r) for r in ['A','AAAA','MX','NS','TXT','CAA']},
         "Email_Security": {
-            "SPF": [txt for txt in get_txt_records(domain) if txt.lower().startswith('v=spf1')] or "No SPF record",
+            "SPF": [t for t in get_txt_records(domain) if t.lower().startswith('v=spf1')] or "No SPF record",
             "DMARC": get_txt_records(f"_dmarc.{domain}") or "No DMARC record",
             "DKIM": get_dkim_selectors(domain) or "No DKIM found"
         },
@@ -242,8 +226,7 @@ def api_recon():
         "SSL_Certificate": get_ssl_info(domain),
         "DNSSEC": get_dnssec_status(domain),
         "HTTP_Headers": fetch_http_headers(domain)
-    }
-    return jsonify(result)
+    })
 
 @app.route("/api/ipinfo_ip")
 def api_ipinfo_ip():
