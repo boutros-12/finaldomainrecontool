@@ -16,7 +16,6 @@ button { padding: 8px 14px; cursor: pointer; }
 <body>
 <h1>Domain Reconnaissance Tool</h1>
 
-<!-- Domain Lookup -->
 <h3>Domain Lookup</h3>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()">
 <button onclick="runRecon()">Run Recon</button>
@@ -24,7 +23,6 @@ button { padding: 8px 14px; cursor: pointer; }
 <div class="error" id="error"></div>
 <div id="output"></div><hr>
 
-<!-- IPinfo -->
 <h3>IP Lookup (IPinfo)</h3>
 <input id="ipinfoInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runIpinfo()">
 <button onclick="runIpinfo()">Lookup</button>
@@ -32,7 +30,6 @@ button { padding: 8px 14px; cursor: pointer; }
 <div class="error" id="errorIpinfo"></div>
 <div id="outputIpinfo"></div><hr>
 
-<!-- AbuseIPDB -->
 <h3>IP Reputation (AbuseIPDB)</h3>
 <input id="abuseIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runAbuseIPDB()">
 <button onclick="runAbuseIPDB()">Check</button>
@@ -40,27 +37,16 @@ button { padding: 8px 14px; cursor: pointer; }
 <div class="error" id="errorAbuse"></div>
 <div id="outputAbuse"></div><hr>
 
-<!-- Subfinder -->
 <h3>Subdomain Enumeration (Subfinder)</h3>
 <input id="subfinderDomainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runSubfinder()">
 <button onclick="runSubfinder()">Find</button>
-<div id="loadingSubfinder" class="loading">Loading...</div>
+<div id="loadingSubfinder" class="loading">Scanning...</div>
 <div class="error" id="errorSubfinder"></div>
 <div id="outputSubfinder"></div><hr>
-
-<!-- Port Scan -->
-<h3>Port Scan</h3>
-<input id="portScanIP" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runPortScan()">
-<input id="portRange" placeholder="1-1024" style="width:120px">
-<button onclick="runPortScan()">Scan</button>
-<div id="loadingPortScan" class="loading">Scanning...</div>
-<div class="error" id="errorPortScan"></div>
-<div id="outputPortScan"></div>
 
 <script>
 function validateDomain(name){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(name);}
 function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
-function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied to clipboard!");}
 
 async function runRecon(){
   error.textContent=''; output.innerHTML=''; loading.style.display='block';
@@ -96,20 +82,6 @@ async function runSubfinder(){
       loadingSubfinder.style.display='none'; const d=await r.json();
       outputSubfinder.innerHTML=`<div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;}
   catch(e){loadingSubfinder.style.display='none'; errorSubfinder.textContent=e;}
-}
-
-async function runPortScan(){
-  errorPortScan.textContent=''; outputPortScan.innerHTML=''; loadingPortScan.style.display='block';
-  const ip=portScanIP.value.trim(); const range=portRange.value.trim()||'1-1024';
-  if(!validateIPv4(ip)) return errorPortScan.textContent='Invalid IPv4';
-  try{const r=await fetch(`/api/portscan?ip=${encodeURIComponent(ip)}&ports=${encodeURIComponent(range)}`);
-      loadingPortScan.style.display='none'; const d=await r.json();
-      if(d.open_ports && d.open_ports.length > 0){
-        let html="<div class='output-box'><strong>Open Ports:</strong><ul>";
-        d.open_ports.forEach(p=>{html+=`<li><strong>${p.port}:</strong> ${p.banner}</li>`;});
-        html+="</ul></div>"; outputPortScan.innerHTML=html;
-      } else {outputPortScan.innerHTML="<div class='output-box'>No open ports found.</div>";}}
-  catch(e){loadingPortScan.style.display='none'; errorPortScan.textContent=e;}
 }
 </script>
 </body>

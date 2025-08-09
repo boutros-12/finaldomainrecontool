@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 VIEWDNS_API_KEY = "YOUR_VIEWDNS_KEY"
-IPINFO_TOKEN = "502b0e42f05a1c"  # Your token
+IPINFO_TOKEN = "502b0e42f05a1c"
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
 
 # ===== DNS Functions =====
@@ -56,7 +56,7 @@ def ipinfo_ip_lookup(ip):
     url = f"https://ipinfo.io/{ip}/json?token={IPINFO_TOKEN}"
     for attempt in range(3):
         try:
-            resp = requests.get(url, timeout=(5, 5))  # Separate connect & read timeouts
+            resp = requests.get(url, timeout=(5, 5))
             resp.raise_for_status()
             return resp.json()
         except requests.exceptions.Timeout:
@@ -141,50 +141,6 @@ def subfinder_scan(domain):
     except Exception as e:
         return {"error": str(e)}
 
-# ===== Port Scanner with Banners =====
-def threaded_port_scan(ip, ports="1-1024", timeout=0.6, max_threads=200):
-    try:
-        if '-' in ports:
-            start, end = ports.split('-')
-            port_list = range(int(start), int(end) + 1)
-        else:
-            port_list = [int(p.strip()) for p in ports.split(',') if p.strip().isdigit()]
-    except:
-        return {"error": "Invalid port format"}
-
-    open_ports = []
-    lock = threading.Lock()
-
-    def scan_port(port):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(timeout)
-                if sock.connect_ex((ip, port)) == 0:
-                    banner = "No banner"
-                    try:
-                        sock.settimeout(3)  # longer for banner grab
-                        data = sock.recv(1024)
-                        if data:
-                            banner = data.decode(errors="ignore").strip()
-                    except:
-                        pass
-                    with lock:
-                        open_ports.append({"port": port, "banner": banner})
-        except:
-            pass
-
-    threads = []
-    for port in port_list:
-        t = threading.Thread(target=scan_port, args=(port,))
-        t.start()
-        threads.append(t)
-        if len(threads) >= max_threads:
-            for tt in threads: tt.join()
-            threads = []
-    for tt in threads: tt.join()
-
-    return {"ip": ip, "open_ports": sorted(open_ports, key=lambda x: x["port"])}
-
 # ===== Thread Helper =====
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -201,7 +157,6 @@ def threaded(fn):
 
 threaded_whois = threaded(whois_lookup)
 threaded_subfinder = threaded(subfinder_scan)
-threaded_portscan = threaded(threaded_port_scan)
 
 # ===== Routes =====
 @app.route("/")
@@ -245,13 +200,6 @@ def api_subdomain_scan():
     domain = request.args.get("domain")
     if not domain: return jsonify({"error": "Please provide a domain"}), 400
     return jsonify(threaded_subfinder(domain))
-
-@app.route("/api/portscan")
-def api_portscan():
-    ip = request.args.get("ip")
-    ports = request.args.get("ports", "1-1024")
-    if not ip: return jsonify({"error": "Please provide IP address"}), 400
-    return jsonify(threaded_portscan(ip, ports))
 
 if __name__ == "__main__":
     app.run(debug=True)
