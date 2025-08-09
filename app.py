@@ -148,8 +148,8 @@ def subfinder_scan(domain):
     except Exception as e:
         return {"error": str(e)}
 
-# === Threaded Port Scanner with Banner Grabbing ===
-def threaded_port_scan(ip, ports="1-1024", timeout=0.4, max_threads=200):
+# === Threaded Port Scanner with Longer Banner Timeout ===
+def threaded_port_scan(ip, ports="1-1024", timeout=0.6, max_threads=200):
     port_list = []
     try:
         if '-' in ports:
@@ -166,13 +166,14 @@ def threaded_port_scan(ip, ports="1-1024", timeout=0.4, max_threads=200):
     def scan_port(port):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                # Connection timeout
                 sock.settimeout(timeout)
                 result = sock.connect_ex((ip, port))
                 if result == 0:
-                    # Try grabbing banner
+                    # Try grabbing banner (now 3s timeout)
                     banner = ""
                     try:
-                        sock.settimeout(1.5)
+                        sock.settimeout(3)  # increased timeout
                         data = sock.recv(1024)
                         if data:
                             banner = data.decode(errors='ignore').strip()
