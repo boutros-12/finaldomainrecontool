@@ -80,7 +80,7 @@ def abuseipdb_lookup(ip):
     except Exception as e:
         return {"error": f"AbuseIPDB error: {str(e)}"}
 
-# === WHOIS ===
+# === WHOIS Integration ===
 def whois_lookup(domain):
     try:
         w = whois.whois(domain)
@@ -88,7 +88,7 @@ def whois_lookup(domain):
     except Exception as e:
         return {"error": f"WHOIS error: {str(e)}"}
 
-# === SSL info ===
+# === SSL Certificate fetch ===
 def get_ssl_info(domain):
     host = domain
     if ':' in host:
@@ -110,7 +110,7 @@ def get_ssl_info(domain):
     except Exception as e:
         return {"error": f"SSL error: {str(e)}"}
 
-# === DNSSEC ===
+# === DNSSEC status ===
 def get_dnssec_status(domain):
     try:
         answers = dns.resolver.resolve(domain, 'DNSKEY')
@@ -129,7 +129,7 @@ def fetch_http_headers(domain):
     except Exception as e:
         return {"error": f"HTTP headers error: {str(e)}"}
 
-# === Subfinder ===
+# === Subfinder Integration ===
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
@@ -148,28 +148,76 @@ def subfinder_scan(domain):
     except Exception as e:
         return {"error": str(e)}
 
-# === Socket-based Port Scan ===
-def socket_port_scan(ip, ports="1-1024", timeout=0.5):
-    open_ports = []
+# Common port to service mapping (partial, can be extended)
+COMMON_PORTS = {
+    20: "FTP Data",
+    21: "FTP Control",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    67: "DHCP",
+    68: "DHCP",
+    80: "HTTP",
+    110: "POP3",
+    119: "NNTP",
+    123: "NTP",
+    143: "IMAP",
+    161: "SNMP",
+    194: "IRC",
+    443: "HTTPS",
+    445: "Microsoft-DS",
+    465: "SMTP over SSL",
+    587: "SMTP (submission)",
+    993: "IMAPS",
+    995: "POP3S",
+    3306: "MySQL",
+    3389: "RDP",
+    5900: "VNC",
+    8080: "HTTP Alternate",
+}
+
+# === Threaded fast port scanner with service name detection ===
+def threaded_port_scan(ip, ports="1-1024", timeout=0.4, max_threads=200):
+    port_list = []
     try:
         if '-' in ports:
             start, end = ports.split('-')
-            port_range = range(int(start), int(end) + 1)
+            port_list = list(range(int(start), int(end) + 1))
         else:
-            # Comma-separated or single ports
-            port_range = [int(p.strip()) for p in ports.split(',')]
-        for port in port_range:
+            port_list = [int(p.strip()) for p in ports.split(',') if p.strip().isdigit()]
+    except:
+        port_list = [int(ports)]
+
+    open_ports = []
+    lock = threading.Lock()
+
+    def scan_port(port):
+        try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(timeout)
-                try:
-                    result = sock.connect_ex((ip, port))
-                    if result == 0:
-                        open_ports.append(port)
-                except:
-                    pass
-        return {"ip": ip, "open_ports": open_ports}
-    except Exception as e:
-        return {"error": f"Port scan error: {str(e)}"}
+                result = sock.connect_ex((ip, port))
+                if result == 0:
+                    with lock:
+                        service = COMMON_PORTS.get(port, "Unknown")
+                        open_ports.append({"port": port, "service": service})
+        except:
+            pass
+
+    threads = []
+    for port in port_list:
+        t = threading.Thread(target=scan_port, args=(port,))
+        threads.append(t)
+        t.start()
+        if len(threads) >= max_threads:
+            for tt in threads:
+                tt.join()
+            threads = []
+
+    for tt in threads:
+        tt.join()
+
+    return {"ip": ip, "open_ports": sorted(open_ports, key=lambda x: x["port"])}
 
 # === Thread wrapper for heavy functions ===
 def threaded(fn):
@@ -189,9 +237,9 @@ def threaded(fn):
 
 threaded_whois = threaded(whois_lookup)
 threaded_subfinder = threaded(subfinder_scan)
-threaded_portscan = threaded(socket_port_scan)
+threaded_portscan = threaded(threaded_port_scan)
 
-# === Routes ===
+# === Flask Routes ===
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -204,7 +252,7 @@ def api_recon():
     result = {
         "DNS_Resolution": {"resolved_ips": resolve_domain_to_ips(domain) or "No A records"},
         "ViewDNS": viewdns_dnsrecord(domain),
-        "DNS_Records": {rtype: get_dns_records(domain, rtype) for rtype in ['A','AAAA','MX','NS','TXT','CAA']},
+        "DNS_Records": {rtype: get_dns_records(domain, rtype) for rtype in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CAA']},
         "Email_Security": {
             "SPF": [txt for txt in get_txt_records(domain) if txt.lower().startswith('v=spf1')] or "No SPF record",
             "DMARC": get_txt_records(f"_dmarc.{domain}") or "No DMARC record",
