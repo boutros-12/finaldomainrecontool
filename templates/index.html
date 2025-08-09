@@ -74,17 +74,6 @@
 <div id="loadingSubfinder" class="loading">Scanning...</div>
 <div id="outputSubfinder"></div>
 <div id="errorSubfinder" class="error"></div>
-<hr/>
-
-<!-- ===== Port Scan ===== -->
-<h3>Port Scan</h3>
-<small>Scans an IP for open ports</small><br/>
-<input id="portScanIP" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runPortScan()" />
-<input id="portRange" placeholder="1-1024" style="width:120px" title="Port range" />
-<button onclick="runPortScan()">Scan Ports</button>
-<div id="loadingPortScan" class="loading">Scanning...</div>
-<div id="outputPortScan"></div>
-<div id="errorPortScan" class="error"></div>
 
 <script>
 function validateDomain(name) {
@@ -157,22 +146,6 @@ async function runSubfinder() {
     outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
       <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch (e) { loadingSubfinder.style.display = 'none'; errorSubfinder.textContent = e.message; }
-}
-
-async function runPortScan() {
-  const ip = portScanIP.value.trim();
-  const range = portRange.value.trim() || '1-1024';
-  outputPortScan.innerHTML = ''; errorPortScan.textContent = '';
-  if (!validateIPv4(ip)) return errorPortScan.textContent = 'Invalid IPv4';
-  loadingPortScan.style.display = 'block';
-  try {
-    const r = await fetch(`/api/portscan?ip=${encodeURIComponent(ip)}&ports=${encodeURIComponent(range)}`);
-    loadingPortScan.style.display = 'none';
-    const data = await r.json();
-    if (data.error) return errorPortScan.textContent = data.error;
-    outputPortScan.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputPortScan')">Copy</button>
-      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch (e) { loadingPortScan.style.display = 'none'; errorPortScan.textContent = e.message; }
 }
 </script>
 </body>
