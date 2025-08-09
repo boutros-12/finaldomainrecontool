@@ -14,20 +14,20 @@
   .copy-btn { font-size: 12px; padding: 3px 6px; background: #eee; border: none; cursor: pointer; }
   @media(max-width: 600px) { input { width: 100%; margin-bottom: 8px; } button { width: 100%; margin-top: 5px; } }
 
-  /* New output styling */
+  /* Output box styling */
   .output-box {
     background: #f4f4f4;
     border: 1px solid #ccc;
     padding: 12px;
     margin-top: 10px;
     max-width: 100%;
-    max-height: 400px;     /* limit vertical size */
-    overflow: auto;        /* scroll if needed */
+    max-height: 400px;
+    overflow: auto;
     box-sizing: border-box;
   }
   .output-box pre {
     margin: 0;
-    white-space: pre-wrap; /* preserve formatting but wrap long lines */
+    white-space: pre-wrap;
     word-break: break-word;
   }
 </style>
@@ -36,6 +36,7 @@
 
 <h1>Domain Reconnaissance Tool</h1>
 
+<!-- ===== Domain Lookup ===== -->
 <h3>Domain Lookup</h3>
 <small>Gets DNS, SPF, DKIM, DMARC, and other records</small><br/>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
@@ -45,6 +46,7 @@
 <div id="error" class="error"></div>
 <hr/>
 
+<!-- ===== IP Lookup ===== -->
 <h3>IP Lookup (IPinfo)</h3>
 <small>Shows location, ASN, and timezone info for an IP</small><br/>
 <input id="ipinfoInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runIpinfo()" />
@@ -54,6 +56,7 @@
 <div id="errorIpinfo" class="error"></div>
 <hr/>
 
+<!-- ===== AbuseIPDB ===== -->
 <h3>IP Reputation (AbuseIPDB)</h3>
 <small>Checks malicious activity reports for an IP</small><br/>
 <input id="abuseIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runAbuseIPDB()" />
@@ -63,6 +66,7 @@
 <div id="errorAbuse" class="error"></div>
 <hr/>
 
+<!-- ===== Subfinder ===== -->
 <h3>Subdomain Enumeration (Subfinder)</h3>
 <small>Finds related subdomains known on the internet</small><br/>
 <input id="subfinderDomainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runSubfinder()" />
@@ -70,6 +74,17 @@
 <div id="loadingSubfinder" class="loading">Scanning...</div>
 <div id="outputSubfinder"></div>
 <div id="errorSubfinder" class="error"></div>
+<hr/>
+
+<!-- ===== Port Scan ===== -->
+<h3>Port Scan</h3>
+<small>Scans an IP for open ports</small><br/>
+<input id="portScanIP" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runPortScan()" />
+<input id="portRange" placeholder="1-1024" style="width:120px" title="Port range" />
+<button onclick="runPortScan()">Scan Ports</button>
+<div id="loadingPortScan" class="loading">Scanning...</div>
+<div id="outputPortScan"></div>
+<div id="errorPortScan" class="error"></div>
 
 <script>
 function validateDomain(name) {
@@ -95,7 +110,7 @@ async function runRecon() {
     const data = await r.json();
     if (data.error) return error.textContent = data.error;
     output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch (e) { loading.style.display = 'none'; error.textContent = e.message; }
 }
 
@@ -110,7 +125,7 @@ async function runIpinfo() {
     const data = await r.json();
     if (data.error) return errorIpinfo.textContent = data.error;
     outputIpinfo.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch (e) { loadingIpinfo.style.display = 'none'; errorIpinfo.textContent = e.message; }
 }
 
@@ -125,7 +140,7 @@ async function runAbuseIPDB() {
     const data = await r.json();
     if (data.error) return errorAbuse.textContent = data.error;
     outputAbuse.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch (e) { loadingAbuse.style.display = 'none'; errorAbuse.textContent = e.message; }
 }
 
@@ -140,8 +155,24 @@ async function runSubfinder() {
     const data = await r.json();
     if (data.error) return errorSubfinder.textContent = data.error;
     outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch (e) { loadingSubfinder.style.display = 'none'; errorSubfinder.textContent = e.message; }
+}
+
+async function runPortScan() {
+  const ip = portScanIP.value.trim();
+  const range = portRange.value.trim() || '1-1024';
+  outputPortScan.innerHTML = ''; errorPortScan.textContent = '';
+  if (!validateIPv4(ip)) return errorPortScan.textContent = 'Invalid IPv4';
+  loadingPortScan.style.display = 'block';
+  try {
+    const r = await fetch(`/api/portscan?ip=${encodeURIComponent(ip)}&ports=${encodeURIComponent(range)}`);
+    loadingPortScan.style.display = 'none';
+    const data = await r.json();
+    if (data.error) return errorPortScan.textContent = data.error;
+    outputPortScan.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputPortScan')">Copy</button>
+      <div class="output-box"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+  } catch (e) { loadingPortScan.style.display = 'none'; errorPortScan.textContent = e.message; }
 }
 </script>
 </body>
