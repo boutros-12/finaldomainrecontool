@@ -11,8 +11,8 @@ from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
-# === API Keys (leave as is per your request) ===
-VIEWDNS_API_KEY = "622f5851adaccc39c603cd9afdd6a6f791ae2b08"
+# === API Keys ===
+VIEWDNS_API_KEY = "YOUR_VIEWDNS_KEY"
 IPINFO_TOKEN = "502b0e42f05a1c"
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
 
@@ -148,36 +148,7 @@ def subfinder_scan(domain):
     except Exception as e:
         return {"error": str(e)}
 
-# Common port to service mapping (partial, can be extended)
-COMMON_PORTS = {
-    20: "FTP Data",
-    21: "FTP Control",
-    22: "SSH",
-    23: "Telnet",
-    25: "SMTP",
-    53: "DNS",
-    67: "DHCP",
-    68: "DHCP",
-    80: "HTTP",
-    110: "POP3",
-    119: "NNTP",
-    123: "NTP",
-    143: "IMAP",
-    161: "SNMP",
-    194: "IRC",
-    443: "HTTPS",
-    445: "Microsoft-DS",
-    465: "SMTP over SSL",
-    587: "SMTP (submission)",
-    993: "IMAPS",
-    995: "POP3S",
-    3306: "MySQL",
-    3389: "RDP",
-    5900: "VNC",
-    8080: "HTTP Alternate",
-}
-
-# === Threaded fast port scanner with service name detection ===
+# === Threaded Port Scanner with Banner Grabbing ===
 def threaded_port_scan(ip, ports="1-1024", timeout=0.4, max_threads=200):
     port_list = []
     try:
@@ -198,9 +169,17 @@ def threaded_port_scan(ip, ports="1-1024", timeout=0.4, max_threads=200):
                 sock.settimeout(timeout)
                 result = sock.connect_ex((ip, port))
                 if result == 0:
+                    # Try grabbing banner
+                    banner = ""
+                    try:
+                        sock.settimeout(1.5)
+                        data = sock.recv(1024)
+                        if data:
+                            banner = data.decode(errors='ignore').strip()
+                    except:
+                        pass
                     with lock:
-                        service = COMMON_PORTS.get(port, "Unknown")
-                        open_ports.append({"port": port, "service": service})
+                        open_ports.append({"port": port, "banner": banner or "No banner"})
         except:
             pass
 
