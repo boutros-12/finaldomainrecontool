@@ -12,13 +12,12 @@ import base64
 
 app = Flask(__name__)
 
-# === API Keys ===
+# ====== API KEYS ======
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "g64zigVr0zv9B6ZZ0sYvxu48q0runWUn"
-
+SHODAN_API_KEY = "Ok0alLl8r0kjNjyM0qIArF2mediolsf4"
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
-# === DNS Helpers ===
+# ====== DNS HELPERS ======
 def get_dns_records(domain, record_type):
     try:
         return [rdata.to_text() for rdata in dns.resolver.resolve(domain, record_type)]
@@ -34,7 +33,7 @@ def resolve_domain_to_ips(domain):
     except Exception:
         return []
 
-# === Thread helper ===
+# ====== THREADING WRAPPER ======
 def threaded(fn):
     def wrapper(*args, **kwargs):
         result = {}
@@ -50,78 +49,54 @@ def threaded(fn):
         return result.get('data', {"error": "Timed out"})
     return wrapper
 
-# === WHOIS ===
-def whois_lookup(domain):
-    try:
-        return whois.whois(domain)
-    except Exception as e:
-        return {"error": str(e)}
-
-threaded_whois = threaded(whois_lookup)
-
-# === Scoring Helpers ===
+# ====== SCORING ======
 def extract_dkim_key_length(dkim_txt_list):
     for txt in dkim_txt_list:
         record = ''.join(part.strip('"') for part in txt.split())
         m = re.search(r'p=([A-Za-z0-9+/=]+)', record)
         if m:
             try:
-                key_bytes = base64.b64decode(m.group(1))
-                return len(key_bytes) * 8
+                return len(base64.b64decode(m.group(1))) * 8
             except Exception:
                 return 0
     return 0
 
 def score_dkim(dkim_txt_list):
     key_len = extract_dkim_key_length(dkim_txt_list)
-    if key_len >= 2048:
-        return 100
-    elif key_len >= 1024:
-        return 70
-    elif key_len > 0:
-        return 50
-    else:
-        return 0
+    if key_len >= 2048: return 100
+    elif key_len >= 1024: return 70
+    elif key_len > 0: return 50
+    return 0
 
 def score_dmarc(dmarc_txt_list):
-    if not dmarc_txt_list:
-        return 0
+    if not dmarc_txt_list: return 0
     for txt in dmarc_txt_list:
         m = re.search(r'p=([a-z]+)', txt.lower())
         if m:
-            if m.group(1) == 'reject':
-                return 100
-            elif m.group(1) == 'quarantine':
-                return 70
-            elif m.group(1) == 'none':
-                return 50
+            if m.group(1) == 'reject': return 100
+            elif m.group(1) == 'quarantine': return 70
+            elif m.group(1) == 'none': return 50
     return 0
 
 def score_spf(spf_txt_list):
-    if not spf_txt_list:
-        return 0
+    if not spf_txt_list: return 0
     for txt in spf_txt_list:
         t = txt.lower()
         if 'v=spf1' in t:
-            if '-all' in t:
-                return 100
-            elif '~all' in t:
-                return 70
-            elif '?all' in t:
-                return 50
-            elif '+all' in t:
-                return 20
-            else:
-                return 50
+            if '-all' in t: return 100
+            elif '~all' in t: return 70
+            elif '?all' in t: return 50
+            elif '+all' in t: return 20
+            else: return 50
     return 0
 
-# === API Route for reconnaissance (SPF, DMARC, DKIM, IPs, scoring) ===
+# ====== RECON API ======
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
     if not domain:
         return jsonify({"error": "Please provide a domain"}), 400
-
+    
     SPF_records = [t for t in get_txt_records(domain) if 'v=spf1' in t.lower()]
     DMARC_records = get_txt_records(f"_dmarc.{domain}")
 
@@ -132,10 +107,9 @@ def api_recon():
         if recs:
             dkim_selectors[sel] = recs
             dkim_scores[sel] = score_dkim(recs)
-
+    
     spf_score = score_spf(SPF_records)
     dmarc_score = score_dmarc(DMARC_records)
-
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
@@ -145,7 +119,7 @@ def api_recon():
         "DKIM": {"records": dkim_selectors or "No DKIM found", "scores": dkim_scores}
     })
 
-# === AbuseIPDB route ===
+# ====== ABUSEIPDB ======
 @app.route('/api/abuseipdb_ip')
 def api_abuseipdb_ip():
     ip = request.args.get('ip')
@@ -161,13 +135,12 @@ def api_abuseipdb_ip():
     except Exception as e:
         return {"error": str(e)}
 
-# === Subfinder scan ===
+# ====== SUBFINDER ======
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
         p = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=60)
-        if p.returncode != 0:
-            return {"error": p.stderr.strip()}
+        if p.returncode != 0: return {"error": p.stderr.strip()}
         subs = []
         for line in p.stdout.splitlines():
             if line.strip():
@@ -175,7 +148,7 @@ def subfinder_scan(domain):
                     data = json.loads(line)
                     if "host" in data:
                         subs.append(data["host"])
-                except json.JSONDecodeError:
+                except:
                     continue
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
@@ -192,21 +165,20 @@ def api_subdomain_scan():
         return jsonify({"error": "Please provide a domain"}), 400
     return jsonify(threaded_subfinder(domain))
 
-# === Shodan route without advanced Cloudflare detection ===
+# ====== SHODAN ======
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
     if not ip:
         return jsonify({"error": "Please provide IP address"}), 400
     try:
-        result = shodan_api.host(ip)
-        return jsonify(result)
+        return jsonify(shodan_api.host(ip))
     except shodan.APIError as e:
         return {"error": f"Shodan API error: {str(e)}"}
     except Exception as e:
         return {"error": str(e)}
 
-# === Root route ===
+# ====== ROOT ======
 @app.route('/')
 def index():
     return render_template('index.html')
