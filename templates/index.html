@@ -14,19 +14,15 @@ button{border:none;border-radius:4px;background:#007BFF;color:white;cursor:point
 button:hover{background:#0056b3;}
 .error{color:#b30000;margin-top:8px;}
 .loading{color:#666;display:none;}
-.output-box{
-  background:#fff;
-  padding:15px;
-  border:1px solid #ccc;
-  border-radius:6px;
-  margin-top:10px;
-  white-space:pre-wrap;       /* Wrap long lines */
-  word-break:break-word;      /* Break super long words if needed */
-  max-height:400px;           /* Height before vertical scroll */
-  overflow-y:auto;            /* Vertical scrollbar when needed */
-  overflow-x:hidden;          /* No horizontal scroll */
-  line-height:1.4;
+.output-box pre {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 5px 0;
 }
+
 .copy-btn{font-size:12px;padding:4px 8px;background:#eee;border:1px solid #ccc;cursor:pointer;border-radius:4px;margin-bottom:10px;}
 /* Score badges */
 .score-badge{display:inline-block;padding:4px 10px;border-radius:12px;color:#fff;font-weight:bold;font-size:13px;margin-left:6px;}
