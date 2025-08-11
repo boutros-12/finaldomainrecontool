@@ -29,6 +29,12 @@ def get_dns_records(domain, record_type):
 def get_txt_records(domain):
     return get_dns_records(domain, 'TXT')
 
+def resolve_domain_to_ips(domain):
+    try:
+        return [rdata.to_text() for rdata in dns.resolver.resolve(domain, 'A')]
+    except Exception:
+        return []
+
 # === Thread helper ===
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -45,7 +51,7 @@ def threaded(fn):
         return result.get('data', {"error": "Timed out"})
     return wrapper
 
-# === WHOIS (thread-safe) ===
+# === WHOIS ===
 def whois_lookup(domain):
     try:
         return whois.whois(domain)
@@ -110,7 +116,7 @@ def score_spf(spf_txt_list):
                 return 50
     return 0
 
-# === Recon: SPF, DKIM, DMARC with scores ===
+# === Recon endpoint with IPs added ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
@@ -130,8 +136,10 @@ def api_recon():
 
     spf_score = score_spf(SPF_records)
     dmarc_score = score_dmarc(DMARC_records)
+    resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
+        "Resolved_IPs": resolved_ips,
         "SPF": {"records": SPF_records or "No SPF record", "score": spf_score},
         "DMARC": {"records": DMARC_records or "No DMARC record", "score": dmarc_score},
         "DKIM": {"records": dkim_selectors or "No DKIM found", "scores": dkim_scores}
@@ -153,7 +161,7 @@ def api_abuseipdb_ip():
     except Exception as e:
         return {"error": str(e)}
 
-# === Subfinder scan ===
+# === Subfinder ===
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
@@ -171,7 +179,7 @@ def subfinder_scan(domain):
                     continue
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
-        return {"error": "Subfinder scan timed out"}
+        return {"error": "Subfinder timed out"}
     except Exception as e:
         return {"error": str(e)}
 

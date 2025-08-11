@@ -12,10 +12,13 @@
   .loading { font-style: italic; margin-top: 10px; color: #555; display: none; }
   h3 { margin-top: 40px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
   .copy-btn { font-size: 12px; padding: 3px 6px; background: #eee; border: none; cursor: pointer; }
-  @media(max-width: 600px) { input { width: 100%; margin-bottom: 8px; } button { width: 100%; margin-top: 5px; } }
-  .output-box { background: #f4f4f4; border: 1px solid #ccc; padding: 12px; margin-top: 10px;
-    max-width: 100%; max-height: 400px; overflow: auto; box-sizing: border-box; }
+  .output-box { background: #f4f4f4; border: 1px solid #ccc; padding: 12px; margin-top: 10px; }
   .output-box pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .score-bar { height: 18px; background-color: #eee; border-radius: 9px; overflow: hidden; width: 300px; margin-bottom: 10px; }
+  .score-fill { height: 100%; text-align: center; color: white; font-size: 12px; line-height: 18px; font-weight: bold; }
+  .score-fill.high { background-color: #4CAF50; }
+  .score-fill.medium { background-color: #FF9800; }
+  .score-fill.low { background-color: #f44336; }
 </style>
 </head>
 <body>
@@ -23,25 +26,15 @@
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup</h3>
-<small>Gets SPF, DKIM, and DMARC records for the domain</small><br/>
+<small>Gets SPF, DKIM, and DMARC records + IPs for the domain (scored)</small><br/>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
-<button onclick="runRecon()">Check SPF / DKIM / DMARC</button>
+<button onclick="runRecon()">Check SPF / DKIM / DMARC / IPs</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
 <div id="output"></div>
 <hr/>
 
-<h3>IP Lookup (IPinfo)</h3>
-<small>Shows location, ASN, and timezone info for an IP</small><br/>
-<input id="ipinfoInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runIpinfo()" />
-<button onclick="runIpinfo()">Lookup IPinfo</button>
-<div id="loadingIpinfo" class="loading">Loading...</div>
-<div id="errorIpinfo" class="error"></div>
-<div id="outputIpinfo"></div>
-<hr/>
-
 <h3>IP Reputation (AbuseIPDB)</h3>
-<small>Checks malicious activity reports for an IP</small><br/>
 <input id="abuseIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runAbuseIPDB()" />
 <button onclick="runAbuseIPDB()">Check Abuse</button>
 <div id="loadingAbuse" class="loading">Loading...</div>
@@ -50,7 +43,6 @@
 <hr/>
 
 <h3>Subdomain Enumeration (Subfinder)</h3>
-<small>Finds related subdomains known on the internet</small><br/>
 <input id="subfinderDomainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runSubfinder()" />
 <button onclick="runSubfinder()">Find Subdomains</button>
 <div id="loadingSubfinder" class="loading">Scanning...</div>
@@ -59,7 +51,6 @@
 <hr/>
 
 <h3>IP Lookup (Shodan)</h3>
-<small>Shows detailed Shodan data for an IP address</small><br/>
 <input id="shodanIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runShodanIp()" />
 <button onclick="runShodanIp()">Lookup Shodan</button>
 <div id="loadingShodan" class="loading">Loading...</div>
@@ -70,110 +61,87 @@
 <script>
 function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
 function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
-function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied to clipboard!");}
+function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied!");}
+function scoreClass(s){if(s>=80)return"score-fill high";if(s>=50)return"score-fill medium";return"score-fill low";}
 
 async function runRecon(){
-  error.textContent = ''; output.innerHTML = ''; loading.style.display = 'block';
-  const domain = domainInput.value.trim();
-  if(!validateDomain(domain)) {
-    loading.style.display = 'none';
-    return error.textContent = 'Invalid domain';
-  }
-  try {
-    const resp = await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
-    loading.style.display = 'none';
-    const data = await resp.json();
-    if(data.error) return error.textContent = data.error;
-    output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
-      <div class="output-box" id="output">
-        <b>SPF:</b><pre>${JSON.stringify(data.SPF, null, 2)}</pre>
-        <b>DMARC:</b><pre>${JSON.stringify(data.DMARC, null, 2)}</pre>
-        <b>DKIM:</b><pre>${JSON.stringify(data.DKIM, null, 2)}</pre>
-      </div>`;
-  } catch(e) {
-    loading.style.display = 'none';
-    error.textContent = e;
-  }
-}
+  error.textContent=''; output.innerHTML=''; loading.style.display='block';
+  const domain=domainInput.value.trim();
+  if(!validateDomain(domain))return error.textContent='Invalid domain';
+  try{
+    const r=await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
+    loading.style.display='none';
+    const d=await r.json();
+    if(d.error)return error.textContent=d.error;
 
-async function runIpinfo(){
-  errorIpinfo.textContent = ''; outputIpinfo.innerHTML = ''; loadingIpinfo.style.display = 'block';
-  const ip = ipinfoInput.value.trim();
-  if(!validateIPv4(ip)) {
-    loadingIpinfo.style.display = 'none';
-    return errorIpinfo.textContent = 'Invalid IPv4';
-  }
-  try {
-    const resp = await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
-    loadingIpinfo.style.display = 'none';
-    const data = await resp.json();
-    if(data.error) return errorIpinfo.textContent = data.error;
-    outputIpinfo.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
-      <div class="output-box" id="outputIpinfo"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch(e) {
-    loadingIpinfo.style.display = 'none';
-    errorIpinfo.textContent = e;
-  }
+    let spfRec = Array.isArray(d.SPF.records)?d.SPF.records.join("\n"):d.SPF.records;
+    let dmarcRec = Array.isArray(d.DMARC.records)?d.DMARC.records.join("\n"):d.DMARC.records;
+    let ips = Array.isArray(d.Resolved_IPs) ? d.Resolved_IPs.join(", ") : d.Resolved_IPs;
+
+    let dkimHtml="";
+    if(typeof d.DKIM.records==="string"){
+      dkimHtml=`<pre>${d.DKIM.records}</pre>`;
+    }else{
+      for(const s in d.DKIM.records){
+        let score=d.DKIM.scores[s]||0;
+        let recs=d.DKIM.records[s].join("\n");
+        dkimHtml+=`<b>${s} (Score: ${score})</b><br/><pre>${recs}</pre>
+        <div class="score-bar"><div class="${scoreClass(score)}" style="width:${score}%;"></div></div>`;
+      }
+    }
+
+    output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
+    <div class="output-box" id="output">
+      <b>Resolved IPs:</b> ${ips}<br/><br/>
+      <b>SPF (Score: ${d.SPF.score}):</b><pre>${spfRec}</pre>
+      <div class="score-bar"><div class="${scoreClass(d.SPF.score)}" style="width:${d.SPF.score}%;"></div></div>
+      <b>DMARC (Score: ${d.DMARC.score}):</b><pre>${dmarcRec}</pre>
+      <div class="score-bar"><div class="${scoreClass(d.DMARC.score)}" style="width:${d.DMARC.score}%;"></div></div>
+      <b>DKIM:</b><br/>${dkimHtml}
+    </div>`;
+  }catch(e){loading.style.display='none'; error.textContent=e;}
 }
 
 async function runAbuseIPDB(){
-  errorAbuse.textContent = ''; outputAbuse.innerHTML = ''; loadingAbuse.style.display = 'block';
-  const ip = abuseIpInput.value.trim();
-  if(!validateIPv4(ip)) {
-    loadingAbuse.style.display = 'none';
-    return errorAbuse.textContent = 'Invalid IPv4';
-  }
-  try {
-    const resp = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
-    loadingAbuse.style.display = 'none';
-    const data = await resp.json();
-    if(data.error) return errorAbuse.textContent = data.error;
-    outputAbuse.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
-      <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch(e) {
-    loadingAbuse.style.display = 'none';
-    errorAbuse.textContent = e;
-  }
+  errorAbuse.textContent=''; outputAbuse.innerHTML=''; loadingAbuse.style.display='block';
+  const ip=abuseIpInput.value.trim();
+  if(!validateIPv4(ip))return errorAbuse.textContent='Invalid IPv4';
+  try{
+    const r=await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
+    loadingAbuse.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorAbuse.textContent=d.error;
+    outputAbuse.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
+    <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingAbuse.style.display='none'; errorAbuse.textContent=e;}
 }
 
 async function runSubfinder(){
-  errorSubfinder.textContent = ''; outputSubfinder.innerHTML = ''; loadingSubfinder.style.display = 'block';
-  const dom = subfinderDomainInput.value.trim();
-  if(!validateDomain(dom)) {
-    loadingSubfinder.style.display = 'none';
-    return errorSubfinder.textContent = 'Invalid domain';
-  }
-  try {
-    const resp = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
-    loadingSubfinder.style.display = 'none';
-    const data = await resp.json();
-    if(data.error) return errorSubfinder.textContent = "Error: " + data.error;
-    outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
-      <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch(e) {
-    loadingSubfinder.style.display = 'none';
-    errorSubfinder.textContent = e;
-  }
+  errorSubfinder.textContent=''; outputSubfinder.innerHTML=''; loadingSubfinder.style.display='block';
+  const dom=subfinderDomainInput.value.trim();
+  if(!validateDomain(dom))return errorSubfinder.textContent='Invalid domain';
+  try{
+    const r=await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
+    loadingSubfinder.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorSubfinder.textContent="Error: "+d.error;
+    outputSubfinder.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
+    <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingSubfinder.style.display='none'; errorSubfinder.textContent=e;}
 }
 
 async function runShodanIp(){
-  errorShodan.textContent = ''; outputShodan.innerHTML = ''; loadingShodan.style.display = 'block';
-  const ip = shodanIpInput.value.trim();
-  if(!validateIPv4(ip)) {
-    loadingShodan.style.display = 'none';
-    return errorShodan.textContent = 'Invalid IPv4';
-  }
-  try {
-    const resp = await fetch(`/api/shodan_ip?ip=${encodeURIComponent(ip)}`);
-    loadingShodan.style.display = 'none';
-    const data = await resp.json();
-    if(data.error) return errorShodan.textContent = data.error;
-    outputShodan.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
-      <div class="output-box" id="outputShodan"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
-  } catch(e) {
-    loadingShodan.style.display = 'none';
-    errorShodan.textContent = e;
-  }
+  errorShodan.textContent=''; outputShodan.innerHTML=''; loadingShodan.style.display='block';
+  const ip=shodanIpInput.value.trim();
+  if(!validateIPv4(ip))return errorShodan.textContent='Invalid IPv4';
+  try{
+    const r=await fetch(`/api/shodan_ip?ip=${encodeURIComponent(ip)}`);
+    loadingShodan.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorShodan.textContent=d.error;
+    outputShodan.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
+    <div class="output-box" id="outputShodan"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingShodan.style.display='none'; errorShodan.textContent=e;}
 }
 </script>
 
