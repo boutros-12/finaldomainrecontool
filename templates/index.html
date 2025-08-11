@@ -34,8 +34,8 @@ button:hover{background:#0056b3;}
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup</h3>
-<small>SPF, DKIM (multiple selectors), DMARC, MX Records, and Resolved IPs with scores</small>
-<input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()"> 
+<small>Enter domain (e.g., <b>example.com</b>) or DKIM selector:domain (e.g., <b>google:google.com</b>)</small>
+<input id="domainInput" placeholder="example.com or selector:domain.com" onkeypress="if(event.key==='Enter') runRecon()"> 
 <button onclick="runRecon()">Run Recon</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
@@ -69,7 +69,7 @@ button:hover{background:#0056b3;}
 function scoreClass(s){return s>=80?'high':s>=50?'medium':'low';}
 function scoreLabel(s){return s>=80?'Excellent':s>=50?'Good':'Poor';}
 function scoreBar(s){
-  let cls=scoreClass(s),label=scoreLabel(s);
+  const cls=scoreClass(s),label=scoreLabel(s);
   return `<span class="scorebar-label ${cls}">${label} (${s})</span>
           <div class="scorebar-outer"><div class="scorebar-inner ${cls}" style="width:${Math.max(0,Math.min(s,100))}%;"></div></div>`;
 }
@@ -83,8 +83,8 @@ function setIpInputs(ip){
 async function runRecon(){
   error.textContent='';output.innerHTML='';loading.style.display='block';
   const domain=domainInput.value.trim();
-  if(!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)){
-    loading.style.display='none';return error.textContent='Invalid domain';
+  if(!/^([a-zA-Z0-9_-]+:)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)){
+    loading.style.display='none';return error.textContent='Invalid domain or selector:domain format';
   }
   try{
     const r=await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
@@ -116,7 +116,7 @@ async function runRecon(){
 async function runAbuseIPDB(){
   errorAbuse.textContent='';outputAbuse.innerHTML='';loadingAbuse.style.display='block';
   const ip=abuseIpInput.value.trim();
-  if(!/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip)){
+  if(!/^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$/.test(ip)){
     loadingAbuse.style.display='none';return errorAbuse.textContent='Invalid IPv4';
   }
   try{
@@ -146,7 +146,7 @@ async function runSubfinder(){
 async function runShodanIp(){
   errorShodan.textContent='';outputShodan.innerHTML='';loadingShodan.style.display='block';
   const ip=shodanIpInput.value.trim();
-  if(!/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip)){
+  if(!/^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$/.test(ip)){
     loadingShodan.style.display='none';return errorShodan.textContent='Invalid IPv4';
   }
   try{
