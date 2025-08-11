@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "ezFDoLAioWWII7RtYaA8xDXy2316qc8x"
+SHODAN_API_KEY = "bMpyV5fA7JuWQJ6kyTexU9kEwgFqog9F"
 
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
@@ -34,7 +34,7 @@ def resolve_domain_to_ips(domain):
     except Exception:
         return []
 
-# === Thread Helper ===
+# === Thread helper ===
 def threaded(fn):
     def wrapper(*args, **kwargs):
         result = {}
@@ -59,7 +59,7 @@ def whois_lookup(domain):
 
 threaded_whois = threaded(whois_lookup)
 
-# === Scoring ===
+# === Scoring Helpers ===
 def extract_dkim_key_length(dkim_txt_list):
     for txt in dkim_txt_list:
         record = ''.join(part.strip('"') for part in txt.split())
@@ -115,7 +115,7 @@ def score_spf(spf_txt_list):
                 return 50
     return 0
 
-# === Recon Endpoint ===
+# === API Route for reconnaissance (SPF, DMARC, DKIM, IPs, scoring) ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
@@ -135,20 +135,17 @@ def api_recon():
 
     spf_score = score_spf(SPF_records)
     dmarc_score = score_dmarc(DMARC_records)
-    dkim_avg_score = sum(dkim_scores.values()) / len(dkim_scores) if dkim_scores else 0
 
-    total_score = round((spf_score + dmarc_score + dkim_avg_score) / 3)
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
-        "Total_Security_Score": total_score,
         "Resolved_IPs": resolved_ips,
         "SPF": {"records": SPF_records or "No SPF record", "score": spf_score},
         "DMARC": {"records": DMARC_records or "No DMARC record", "score": dmarc_score},
         "DKIM": {"records": dkim_selectors or "No DKIM found", "scores": dkim_scores}
     })
 
-# === AbuseIPDB ===
+# === AbuseIPDB route ===
 @app.route('/api/abuseipdb_ip')
 def api_abuseipdb_ip():
     ip = request.args.get('ip')
@@ -164,7 +161,7 @@ def api_abuseipdb_ip():
     except Exception as e:
         return {"error": str(e)}
 
-# === Subfinder ===
+# === Subfinder scan ===
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
@@ -195,7 +192,7 @@ def api_subdomain_scan():
         return jsonify({"error": "Please provide a domain"}), 400
     return jsonify(threaded_subfinder(domain))
 
-# === Shodan ===
+# === Shodan route without advanced Cloudflare detection ===
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
@@ -203,25 +200,13 @@ def api_shodan_ip():
         return jsonify({"error": "Please provide IP address"}), 400
     try:
         result = shodan_api.host(ip)
-        cf_protect = False
-        cf_message = ""
-        for item in result.get('data', []):
-            http_data = item.get('http', {})
-            if 'server' in http_data and 'cloudflare' in http_data['server'].lower():
-                html_content = http_data.get('html', '').lower()
-                if 'direct ip access not allowed' in html_content or 'error 1003' in html_content:
-                    cf_protect = True
-                    cf_message = "Note: This IP is protected by Cloudflare. Some scan results may be limited."
-                    break
-        if cf_protect:
-            result['cloudflare_protection'] = True
-            result['cloudflare_message'] = cf_message
         return jsonify(result)
     except shodan.APIError as e:
         return {"error": f"Shodan API error: {str(e)}"}
     except Exception as e:
         return {"error": str(e)}
 
+# === Root route ===
 @app.route('/')
 def index():
     return render_template('index.html')
