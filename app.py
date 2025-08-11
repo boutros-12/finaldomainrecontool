@@ -13,8 +13,8 @@ import base64
 app = Flask(__name__)
 
 # === API Keys ===
-ABUSEIPDB_API_KEY = "YOUR_ABUSEIPDB_API_KEY"
-SHODAN_API_KEY = "YOUR_SHODAN_API_KEY"
+ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
+SHODAN_API_KEY = "Ok0alLl8r0kjNjyM0qIArF2mediolsf4"
 
 # Shodan API client
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
