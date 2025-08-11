@@ -5,11 +5,11 @@ import shodan
 app = Flask(__name__)
 
 # === API Keys ===
-ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "rnR7ElQ4zex2TyQ7XOdwayepytPCLY58"
+ABUSEIPDB_API_KEY = "YOUR_ABUSEIPDB_API_KEY"
+SHODAN_API_KEY = "YOUR_SHODAN_API_KEY"
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
-# Common DKIM selectors
+# Common DKIM selectors to try if no selector is provided
 COMMON_DKIM_SELECTORS = ["selector1", "selector2", "default", "google", "k1"]
 
 # === DNS Helpers ===
@@ -89,12 +89,21 @@ def score_spf(lst):
             else: return 50
     return 0
 
-# === Recon API ===
+# === Recon with :selector parsing ===
 @app.route('/api/recon')
 def api_recon():
-    domain = request.args.get('domain')
-    if not domain:
-        return jsonify({"error":"Please provide a domain"}), 400
+    domain_in = request.args.get('domain')
+    if not domain_in:
+        return jsonify({"error": "Please provide a domain"}), 400
+
+    # Check if input contains a specific DKIM selector (format: selector:domain)
+    selector_mode = None
+    if ":" in domain_in:
+        parts = domain_in.split(":", 1)
+        selector_mode = parts[0].strip()
+        domain = parts[1].strip()
+    else:
+        domain = domain_in.strip()
 
     SPF = [t for t in get_txt_records(domain) if 'v=spf1' in t.lower()]
     DMARC = get_txt_records(f"_dmarc.{domain}")
@@ -102,11 +111,20 @@ def api_recon():
     IPs = resolve_domain_to_ips(domain) or "No A records"
 
     dkim_recs, dkim_scores = {}, {}
-    for sel in COMMON_DKIM_SELECTORS:
-        recs = get_txt_records(f"{sel}._domainkey.{domain}")
+
+    if selector_mode:
+        # Query only the supplied selector
+        recs = get_txt_records(f"{selector_mode}._domainkey.{domain}")
         if recs:
-            dkim_recs[sel] = recs
-            dkim_scores[sel] = score_dkim(recs)
+            dkim_recs[selector_mode] = recs
+            dkim_scores[selector_mode] = score_dkim(recs)
+    else:
+        # Try all common selectors
+        for sel in COMMON_DKIM_SELECTORS:
+            recs = get_txt_records(f"{sel}._domainkey.{domain}")
+            if recs:
+                dkim_recs[sel] = recs
+                dkim_scores[sel] = score_dkim(recs)
 
     return jsonify({
         "Resolved_IPs": IPs,
@@ -144,7 +162,8 @@ def subfinder_scan(domain):
                 try:
                     data = json.loads(line)
                     if "host" in data: subs.append(data["host"])
-                except json.JSONDecodeError: continue
+                except json.JSONDecodeError:
+                    continue
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
         return {"error": "Subfinder timed out"}
@@ -158,7 +177,7 @@ def api_subdomain_scan():
         return jsonify({"error":"Please provide a domain"}), 400
     return jsonify(threaded(subfinder_scan)(domain))
 
-# === Shodan API ===
+# === Shodan lookup ===
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
@@ -171,7 +190,6 @@ def api_shodan_ip():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# === Frontend ===
 @app.route('/')
 def index():
     return render_template('index.html')
