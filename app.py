@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "HgtpvC3QpPQdudjjvom8KsmQbLVYm1tw"
+SHODAN_API_KEY = "rnR7ElQ4zex2TyQ7XOdwayepytPCLY58"
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
 # Common DKIM selectors
