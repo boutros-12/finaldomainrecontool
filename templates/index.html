@@ -19,6 +19,9 @@
   .score-fill.high { background-color: #4CAF50; }
   .score-fill.medium { background-color: #FF9800; }
   .score-fill.low { background-color: #f44336; }
+  .score-number.high { color: #4CAF50; }
+  .score-number.medium { color: #FF9800; }
+  .score-number.low { color: #f44336; }
 </style>
 </head>
 <body>
@@ -62,7 +65,7 @@
 function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
 function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
 function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied!");}
-function scoreClass(s){if(s>=80)return"score-fill high";if(s>=50)return"score-fill medium";return"score-fill low";}
+function scoreClass(s){if(s>=80)return"high";if(s>=50)return"medium";return"low";}
 
 async function runRecon(){
   error.textContent=''; output.innerHTML=''; loading.style.display='block';
@@ -86,17 +89,21 @@ async function runRecon(){
         let score=d.DKIM.scores[s]||0;
         let recs=d.DKIM.records[s].join("\n");
         dkimHtml+=`<b>${s} (Score: ${score})</b><br/><pre>${recs}</pre>
-        <div class="score-bar"><div class="${scoreClass(score)}" style="width:${score}%;"></div></div>`;
+        <div class="score-bar"><div class="score-fill ${scoreClass(score)}" style="width:${score}%;"></div></div>`;
       }
     }
 
+    let totalClass = scoreClass(d.Total_Security_Score);
+
     output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
     <div class="output-box" id="output">
+      <b>Total Security Score: <span class="score-number ${totalClass}">${d.Total_Security_Score}</span></b>
+      <div class="score-bar"><div class="score-fill ${totalClass}" style="width:${d.Total_Security_Score}%;"></div></div>
       <b>Resolved IPs:</b> ${ips}<br/><br/>
       <b>SPF (Score: ${d.SPF.score}):</b><pre>${spfRec}</pre>
-      <div class="score-bar"><div class="${scoreClass(d.SPF.score)}" style="width:${d.SPF.score}%;"></div></div>
+      <div class="score-bar"><div class="score-fill ${scoreClass(d.SPF.score)}" style="width:${d.SPF.score}%;"></div></div>
       <b>DMARC (Score: ${d.DMARC.score}):</b><pre>${dmarcRec}</pre>
-      <div class="score-bar"><div class="${scoreClass(d.DMARC.score)}" style="width:${d.DMARC.score}%;"></div></div>
+      <div class="score-bar"><div class="score-fill ${scoreClass(d.DMARC.score)}" style="width:${d.DMARC.score}%;"></div></div>
       <b>DKIM:</b><br/>${dkimHtml}
     </div>`;
   }catch(e){loading.style.display='none'; error.textContent=e;}

@@ -16,7 +16,6 @@ app = Flask(__name__)
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
 SHODAN_API_KEY = "bMpyV5fA7JuWQJ6kyTexU9kEwgFqog9F"
 
-# Initialize Shodan client
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
 # === DNS Helpers ===
@@ -35,7 +34,7 @@ def resolve_domain_to_ips(domain):
     except Exception:
         return []
 
-# === Thread helper ===
+# === Thread Helper ===
 def threaded(fn):
     def wrapper(*args, **kwargs):
         result = {}
@@ -60,7 +59,7 @@ def whois_lookup(domain):
 
 threaded_whois = threaded(whois_lookup)
 
-# === Scoring Helpers ===
+# === Scoring ===
 def extract_dkim_key_length(dkim_txt_list):
     for txt in dkim_txt_list:
         record = ''.join(part.strip('"') for part in txt.split())
@@ -116,7 +115,7 @@ def score_spf(spf_txt_list):
                 return 50
     return 0
 
-# === Recon endpoint with IPs added ===
+# === Recon Endpoint ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
@@ -136,9 +135,15 @@ def api_recon():
 
     spf_score = score_spf(SPF_records)
     dmarc_score = score_dmarc(DMARC_records)
+    dkim_avg_score = sum(dkim_scores.values()) / len(dkim_scores) if dkim_scores else 0
+
+    # Total combined security score
+    total_score = round((spf_score + dmarc_score + dkim_avg_score) / 3)
+
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
+        "Total_Security_Score": total_score,
         "Resolved_IPs": resolved_ips,
         "SPF": {"records": SPF_records or "No SPF record", "score": spf_score},
         "DMARC": {"records": DMARC_records or "No DMARC record", "score": dmarc_score},
