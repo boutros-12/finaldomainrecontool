@@ -5,11 +5,11 @@ import shodan
 app = Flask(__name__)
 
 # === API Keys ===
-ABUSEIPDB_API_KEY = "YOUR_ABUSEIPDB_API_KEY"
-SHODAN_API_KEY = "YOUR_SHODAN_API_KEY"
+ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
+SHODAN_API_KEY = "HgtpvC3QpPQdudjjvom8KsmQbLVYm1tw"
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
-# === Common DKIM selectors to check ===
+# Common DKIM selectors
 COMMON_DKIM_SELECTORS = ["selector1", "selector2", "default", "google", "k1"]
 
 # === DNS Helpers ===
@@ -89,7 +89,7 @@ def score_spf(lst):
             else: return 50
     return 0
 
-# === /api/recon with MX + DKIM scan ===
+# === Recon API ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
@@ -120,7 +120,8 @@ def api_recon():
 @app.route('/api/abuseipdb_ip')
 def api_abuseipdb_ip():
     ip = request.args.get('ip')
-    if not ip: return jsonify({"error":"Please provide IP address"}), 400
+    if not ip:
+        return jsonify({"error":"Please provide IP address"}), 400
     try:
         r = requests.get("https://api.abuseipdb.com/api/v2/check",
             headers={"Accept":"application/json", "Key":ABUSEIPDB_API_KEY},
@@ -157,7 +158,7 @@ def api_subdomain_scan():
         return jsonify({"error":"Please provide a domain"}), 400
     return jsonify(threaded(subfinder_scan)(domain))
 
-# === Shodan lookup with 403 error shown ===
+# === Shodan API ===
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
@@ -170,6 +171,7 @@ def api_shodan_ip():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+# === Frontend ===
 @app.route('/')
 def index():
     return render_template('index.html')
