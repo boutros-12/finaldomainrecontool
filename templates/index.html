@@ -19,9 +19,9 @@ button{background:#007BFF;color:white;border:none;cursor:pointer;}
 
 <h1>Domain Reconnaissance Tool</h1>
 
-<h3>Domain Lookup</h3>
-<input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()"/>
-<button onclick="runRecon()">Check SPF / DKIM / DMARC / IPs</button>
+<h3>Domain Lookup (SPF / DKIM / DMARC / IPs)</h3>
+<input id="domainInput" placeholder="example.com or example.com:selector1" onkeypress="if(event.key==='Enter') runRecon()"/>
+<button onclick="runRecon()">Check Records and Scores</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
 <div id="output"></div>
@@ -54,18 +54,38 @@ button{background:#007BFF;color:white;border:none;cursor:pointer;}
 <div id="outputShodan"></div>
 
 <script>
-function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
-function validateIP(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))){3}$/.test(ip);}
+function validateDomainOrSelector(input) {
+  return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:[a-zA-Z0-9_-]+)?$/.test(input);
+}
+function validateIP(ip){
+  return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))){3}$/.test(ip);
+}
 
 async function runRecon(){
   error.textContent=''; output.innerHTML=''; loading.style.display='block';
-  const domain=domainInput.value.trim();
-  if(!validateDomain(domain)){loading.style.display='none'; return error.textContent='Invalid domain';}
-  const resp=await fetch(`/api/recon?domain=${domain}`);
+  const inputVal = domainInput.value.trim();
+  if(!validateDomainOrSelector(inputVal)){
+    loading.style.display='none'; 
+    return error.textContent='Invalid domain or selector format. Example: example.com or example.com:selector1';
+  }
+  let domain = inputVal;
+  let selector = null;
+  if(inputVal.includes(':')){
+    [domain, selector] = inputVal.split(':');
+  }
+  const url = selector ? `/api/recon?domain=${domain}&selector=${selector}` : `/api/recon?domain=${domain}`;
+  const resp = await fetch(url);
   loading.style.display='none';
-  const data=await resp.json();
+  const data = await resp.json();
   if(data.error){error.textContent=data.error;return;}
-  output.innerHTML=`<div class="output-box">${JSON.stringify(data,null,2)}</div>`;
+
+  let outHtml = `<div class="output-box"><strong>Resolved IPs:</strong> ${JSON.stringify(data.Resolved_IPs)}<br><br>`;
+
+  outHtml += `<strong>SPF Records:</strong> ${JSON.stringify(data.SPF.records)}<br>SPF Score: ${data.SPF.score}<br><br>`;
+  outHtml += `<strong>DMARC Records:</strong> ${JSON.stringify(data.DMARC.records)}<br>DMARC Score: ${data.DMARC.score}<br><br>`;
+  outHtml += `<strong>DKIM Records:</strong> ${JSON.stringify(data.DKIM.records)}<br>DKIM Scores: ${JSON.stringify(data.DKIM.scores)}<br><br>`;
+  outHtml += `<strong>Aggregate Email Security Score:</strong> ${data.Aggregate_Email_Security_Score}</div>`;
+  output.innerHTML = outHtml;
 }
 
 async function runAbuseIPDB(){
@@ -82,7 +102,7 @@ async function runAbuseIPDB(){
 async function runSubfinder(){
   errorSubfinder.textContent=''; outputSubfinder.innerHTML=''; loadingSubfinder.style.display='block';
   const dom=subfinderDomainInput.value.trim();
-  if(!validateDomain(dom)){loadingSubfinder.style.display='none'; return errorSubfinder.textContent='Invalid domain';}
+  if(!validateDomainOrSelector(dom)){loadingSubfinder.style.display='none'; return errorSubfinder.textContent='Invalid domain';}
   const resp=await fetch(`/api/subdomain_scan?domain=${dom}`);
   loadingSubfinder.style.display='none';
   const data=await resp.json();
@@ -104,5 +124,3 @@ async function runShodanIp(){
 
 </body>
 </html>
-
-
