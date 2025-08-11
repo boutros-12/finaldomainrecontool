@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "g64zigVr0zv9B6ZZ0sYvxu48q0runWUn"
+SHODAN_API_KEY = "Ok0alLl8r0kjNjyM0qIArF2mediolsf4"
 
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 

@@ -27,6 +27,19 @@ button:hover{background:#0056b3;}
   overflow-x:hidden;
   line-height:1.4;
 }
+.output-box pre {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 7px 0 12px 0;
+  padding: 7px 10px;
+  background: #f4f6fa;
+  border-radius: 4px;
+  border:1px solid #eee;
+  box-shadow: 0 0 2px #eaeaea;
+}
 .copy-btn{font-size:12px;padding:4px 8px;background:#eee;border:1px solid #ccc;cursor:pointer;border-radius:4px;margin-bottom:10px;}
 /* Score badges */
 .score-badge{display:inline-block;padding:4px 10px;border-radius:12px;color:#fff;font-weight:bold;font-size:13px;margin-left:6px;}
@@ -106,7 +119,6 @@ function setIpInputs(ip) {
   document.getElementById('shodanIpInput').value = ip;
   document.getElementById('errorShodan').textContent = '';
   document.getElementById('outputShodan').innerHTML = '';
-  // Smooth scroll to the IP Reputation section
   document.getElementById('abuseIpInput').scrollIntoView({behavior: 'smooth', block: 'center'});
 }
 
@@ -120,12 +132,16 @@ async function runRecon(){
     if(d.error)return error.textContent=d.error;
     let spfRec=Array.isArray(d.SPF.records)?d.SPF.records.join("\n"):d.SPF.records;
     let dmarcRec=Array.isArray(d.DMARC.records)?d.DMARC.records.join("\n"):d.DMARC.records;
-    // Render clickable IPs if resolved IPs are array
     let ips = Array.isArray(d.Resolved_IPs) ? renderResolvedIPs(d.Resolved_IPs) : d.Resolved_IPs;
     let dkimHtml="";
     if(typeof d.DKIM.records==="string"){dkimHtml=`<pre>${d.DKIM.records}</pre>`;}
-    else{for(const s in d.DKIM.records){let score=d.DKIM.scores[s]||0;let recs=d.DKIM.records[s].join("\n");
-      dkimHtml+=`<b>${s} ${badge(score)}</b><br/><pre>${recs}</pre>`;}}
+    else{
+      for(const s in d.DKIM.records){
+        let score=d.DKIM.scores[s]||0;
+        let recs=d.DKIM.records[s].join("\n");
+        dkimHtml+=`<b>${s} ${badge(score)}</b><br/><pre>${recs}</pre>`;
+      }
+    }
     output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
       <div class="output-box" id="output">
         <b>Resolved IPs:</b> ${ips}<br/><br/>
