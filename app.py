@@ -9,6 +9,7 @@ import socket
 import ssl
 import time
 from flask import Flask, request, jsonify, render_template
+import shodan  # Added
 
 app = Flask(__name__)
 
@@ -16,6 +17,10 @@ app = Flask(__name__)
 VIEWDNS_API_KEY = "622f5851adaccc39c603cd9afdd6a6f791ae2b08"
 IPINFO_TOKEN = "502b0e42f05a1c"
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
+SHODAN_API_KEY = "bMpyV5fA7JuWQJ6kyTexU9kEwgFqog9F"  # Your Shodan API key here
+
+# Initialize Shodan client
+shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
 # === DNS Helper ===
 def get_dns_records(domain, record_type):
@@ -82,7 +87,6 @@ def subfinder_scan(domain):
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
         p = subprocess.run(shlex.split(cmd), capture_output=True, text=True, timeout=60)
         if p.returncode != 0:
-            # Return error in JSON instead of HTML
             return {"error": p.stderr.strip()}
         subs = []
         for line in p.stdout.splitlines():
@@ -92,7 +96,6 @@ def subfinder_scan(domain):
                     if "host" in data:
                         subs.append(data["host"])
                 except json.JSONDecodeError:
-                    # Skip lines that aren't valid JSON
                     continue
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
@@ -109,11 +112,7 @@ def api_subdomain_scan():
         return jsonify({"error": "Please provide a domain"}), 400
     return jsonify(threaded_subfinder(domain))
 
-# === Existing routes for IP info and abuse checks ===
-@app.route('/')
-def index():
-    return render_template('index.html')
-
+# === IPinfo & AbuseIPDB routes ===
 @app.route('/api/ipinfo_ip')
 def api_ipinfo_ip():
     ip = request.args.get('ip')
@@ -141,6 +140,25 @@ def api_abuseipdb_ip():
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
+
+# === New Shodan IP lookup route ===
+@app.route('/api/shodan_ip')
+def api_shodan_ip():
+    ip = request.args.get('ip')
+    if not ip:
+        return jsonify({"error": "Please provide IP address"}), 400
+    # We can also do simple IPv4 validation here or reuse the frontend validation.
+    try:
+        result = shodan_api.host(ip)
+        return jsonify(result)
+    except shodan.APIError as e:
+        return jsonify({"error": f"Shodan API error: {str(e)}"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

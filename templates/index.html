@@ -23,10 +23,8 @@
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup</h3>
-<!-- Updated subtitle -->
 <small>Gets SPF, DKIM, and DMARC records for the domain</small><br/>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
-<!-- Updated button text -->
 <button onclick="runRecon()">Check SPF / DKIM / DMARC</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
@@ -60,6 +58,15 @@
 <div id="outputSubfinder"></div>
 <hr/>
 
+<h3>IP Lookup (Shodan)</h3>
+<small>Shows detailed Shodan data for an IP address</small><br/>
+<input id="shodanIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runShodanIp()" />
+<button onclick="runShodanIp()">Lookup Shodan</button>
+<div id="loadingShodan" class="loading">Loading...</div>
+<div id="errorShodan" class="error"></div>
+<div id="outputShodan"></div>
+<hr/>
+
 <script>
 function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
 function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
@@ -76,10 +83,7 @@ async function runRecon(){
     const resp = await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
     loading.style.display = 'none';
     const data = await resp.json();
-    if(data.error) {
-      error.textContent = data.error;
-      return;
-    }
+    if(data.error) return error.textContent = data.error;
     output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
       <div class="output-box" id="output">
         <b>SPF:</b><pre>${JSON.stringify(data.SPF, null, 2)}</pre>
@@ -92,7 +96,7 @@ async function runRecon(){
   }
 }
 
-async function runIpinfo() {
+async function runIpinfo(){
   errorIpinfo.textContent = ''; outputIpinfo.innerHTML = ''; loadingIpinfo.style.display = 'block';
   const ip = ipinfoInput.value.trim();
   if(!validateIPv4(ip)) {
@@ -103,10 +107,7 @@ async function runIpinfo() {
     const resp = await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
     loadingIpinfo.style.display = 'none';
     const data = await resp.json();
-    if(data.error) {
-      errorIpinfo.textContent = data.error;
-      return;
-    }
+    if(data.error) return errorIpinfo.textContent = data.error;
     outputIpinfo.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
       <div class="output-box" id="outputIpinfo"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch(e) {
@@ -115,7 +116,7 @@ async function runIpinfo() {
   }
 }
 
-async function runAbuseIPDB() {
+async function runAbuseIPDB(){
   errorAbuse.textContent = ''; outputAbuse.innerHTML = ''; loadingAbuse.style.display = 'block';
   const ip = abuseIpInput.value.trim();
   if(!validateIPv4(ip)) {
@@ -126,10 +127,7 @@ async function runAbuseIPDB() {
     const resp = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
     loadingAbuse.style.display = 'none';
     const data = await resp.json();
-    if(data.error) {
-      errorAbuse.textContent = data.error;
-      return;
-    }
+    if(data.error) return errorAbuse.textContent = data.error;
     outputAbuse.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
       <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch(e) {
@@ -138,7 +136,7 @@ async function runAbuseIPDB() {
   }
 }
 
-async function runSubfinder() {
+async function runSubfinder(){
   errorSubfinder.textContent = ''; outputSubfinder.innerHTML = ''; loadingSubfinder.style.display = 'block';
   const dom = subfinderDomainInput.value.trim();
   if(!validateDomain(dom)) {
@@ -149,16 +147,32 @@ async function runSubfinder() {
     const resp = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
     loadingSubfinder.style.display = 'none';
     const data = await resp.json();
-    if(data.error) {
-      errorSubfinder.textContent = "Error: " + data.error;
-      outputSubfinder.innerHTML = '';
-      return;
-    }
+    if(data.error) return errorSubfinder.textContent = "Error: " + data.error;
     outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
       <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
   } catch(e) {
     loadingSubfinder.style.display = 'none';
     errorSubfinder.textContent = e;
+  }
+}
+
+async function runShodanIp(){
+  errorShodan.textContent = ''; outputShodan.innerHTML = ''; loadingShodan.style.display = 'block';
+  const ip = shodanIpInput.value.trim();
+  if(!validateIPv4(ip)) {
+    loadingShodan.style.display = 'none';
+    return errorShodan.textContent = 'Invalid IPv4';
+  }
+  try {
+    const resp = await fetch(`/api/shodan_ip?ip=${encodeURIComponent(ip)}`);
+    loadingShodan.style.display = 'none';
+    const data = await resp.json();
+    if(data.error) return errorShodan.textContent = data.error;
+    outputShodan.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
+      <div class="output-box" id="outputShodan"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+  } catch(e) {
+    loadingShodan.style.display = 'none';
+    errorShodan.textContent = e;
   }
 }
 </script>
