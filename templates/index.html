@@ -4,33 +4,110 @@
 <meta charset="UTF-8" />
 <title>Domain Reconnaissance Tool</title>
 <style>
-  body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #f9f9f9; }
-  h1 { color: #333; }
-  h3 { margin-top: 40px; border-bottom: 1px solid #ddd; padding-bottom: 6px; color: #444; }
-  small { color: #666; }
-  input, button { font-size: 16px; padding: 10px; }
-  input { width: 65%; border: 1px solid #ccc; border-radius: 3px; }
-  button { padding: 11px 18px; cursor: pointer; margin-left: 8px; background-color: #007BFF; border: none; border-radius: 3px; color: white; }
-  button:hover { background-color: #0056b3; }
-  .error { color: #d9534f; margin-top: 10px; font-weight: bold; }
-  .loading { font-style: italic; margin-top: 10px; color: #666; display: none; }
-  .output-box { background: white; border: 1px solid #ccc; border-radius: 5px; padding: 15px; margin-top: 10px;
-                max-height: 400px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; line-height: 1.4; }
-  .copy-btn { font-size: 12px; padding: 5px 10px; background: #eee; border: 1px solid #ccc; cursor: pointer; border-radius: 3px; margin-bottom: 10px; }
-  .copy-btn:hover { background: #ddd; }
-  .score-bar { height: 18px; border-radius: 9px; overflow: hidden; width: 300px; margin-bottom: 10px; background: #eee; }
-  .score-fill { height: 100%; text-align: center; color: white; font-weight: bold; font-size: 12px; line-height: 18px; }
-  .score-fill.high { background-color: #4caf50; } /* green */
-  .score-fill.medium { background-color: #ff9800; } /* orange */
-  .score-fill.low { background-color: #f44336; } /* red */
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f2f4f7;
+    color: #333;
+    max-width: 1000px;
+    margin: auto;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #222;
+    margin-bottom: 10px;
+  }
+  h3 {
+    margin-top: 40px;
+    color: #444;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 5px;
+  }
+  small {
+    color: #666;
+    display: block;
+    margin-bottom: 8px;
+  }
+  input {
+    width: 65%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
+  button {
+    padding: 10px 16px;
+    font-size: 16px;
+    background-color: #007BFF;
+    border: none;
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #0056b3;
+  }
+  .error {
+    color: #d9534f;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  .loading {
+    color: #777;
+    font-style: italic;
+    margin-top: 5px;
+    display: none;
+  }
+  .output-box {
+    background-color: white;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 10px;
+    border: 1px solid #ccc;
+    /* Prevent horizontal scrolling */
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 450px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .copy-btn {
+    font-size: 12px;
+    padding: 3px 6px;
+    background: #eee;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-bottom: 10px;
+  }
+  .score-bar {
+    height: 18px;
+    border-radius: 9px;
+    overflow: hidden;
+    width: 300px;
+    margin-bottom: 10px;
+    background: #eee;
+  }
+  .score-fill {
+    height: 100%;
+    font-weight: bold;
+    text-align: center;
+    color: white;
+    font-size: 12px;
+    line-height: 18px;
+  }
+  .score-fill.high { background-color: #4caf50; }
+  .score-fill.medium { background-color: #ff9800; }
+  .score-fill.low { background-color: #f44336; }
 </style>
 </head>
 <body>
 
 <h1>Domain Reconnaissance Tool</h1>
 
+<!-- Recon Section -->
 <h3>Domain Lookup</h3>
-<small>Gets SPF, DKIM (selector1 & 2), DMARC records + Resolved IPs (with scores)</small><br/>
+<small>SPF, DKIM (selector1 & selector2), DMARC records, and resolved IPs with scores</small>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
 <button onclick="runRecon()">Run Recon</button>
 <div id="loading" class="loading">Loading...</div>
@@ -38,8 +115,9 @@
 <div id="output"></div>
 <hr/>
 
+<!-- AbuseIPDB Section -->
 <h3>IP Reputation (AbuseIPDB)</h3>
-<small>Check IP reputation and abuse reports</small><br/>
+<small>Check IP reputation and abuse reports</small>
 <input id="abuseIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runAbuseIPDB()" />
 <button onclick="runAbuseIPDB()">Check Abuse</button>
 <div id="loadingAbuse" class="loading">Loading...</div>
@@ -47,8 +125,9 @@
 <div id="outputAbuse"></div>
 <hr/>
 
+<!-- Subfinder Section -->
 <h3>Subdomain Enumeration (Subfinder)</h3>
-<small>Discover known subdomains for a domain</small><br/>
+<small>Find known subdomains for a domain</small>
 <input id="subfinderDomainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runSubfinder()" />
 <button onclick="runSubfinder()">Find Subdomains</button>
 <div id="loadingSubfinder" class="loading">Scanning...</div>
@@ -56,8 +135,9 @@
 <div id="outputSubfinder"></div>
 <hr/>
 
+<!-- Shodan Section -->
 <h3>IP Lookup (Shodan)</h3>
-<small>Detailed internet scan data for IP</small><br/>
+<small>Detailed internet scan data for IP</small>
 <input id="shodanIpInput" placeholder="8.8.8.8" onkeypress="if(event.key==='Enter') runShodanIp()" />
 <button onclick="runShodanIp()">Lookup Shodan</button>
 <div id="loadingShodan" class="loading">Loading...</div>
@@ -66,180 +146,91 @@
 <hr/>
 
 <script>
-function validateDomain(domain) {
-  return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain);
-}
+// ===== Helpers =====
+function validateDomain(n){return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(n);}
+function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);}
+function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied to clipboard!");}
+function scoreClass(s){if(s>=80)return"score-fill high";if(s>=50)return"score-fill medium";return"score-fill low";}
 
-function validateIPv4(ip) {
-  return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip);
-}
-
-function copyOutput(id) {
-  navigator.clipboard.writeText(document.getElementById(id).innerText);
-  alert("Copied to clipboard!");
-}
-
-function scoreClass(score) {
-  if (score >= 80) return "score-fill high";
-  if (score >= 50) return "score-fill medium";
-  return "score-fill low";
-}
-
+// ===== Recon =====
 async function runRecon(){
-  document.getElementById('error').textContent = '';
-  const output = document.getElementById('output');
-  output.innerHTML = '';
-  document.getElementById('loading').style.display = 'block';
-
-  const domain = document.getElementById('domainInput').value.trim();
-  if(!validateDomain(domain)) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').textContent = 'Invalid domain format.';
-    return;
-  }
-
-  try {
-    const resp = await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
-    const data = await resp.json();
-    document.getElementById('loading').style.display = 'none';
-
-    if(data.error) {
-      document.getElementById('error').textContent = data.error;
-      return;
-    }
-
-    let spfRecords = Array.isArray(data.SPF.records) ? data.SPF.records.join("\n") : data.SPF.records;
-    let dmarcRecords = Array.isArray(data.DMARC.records) ? data.DMARC.records.join("\n") : data.DMARC.records;
-    let resolvedIPs = Array.isArray(data.Resolved_IPs) ? data.Resolved_IPs.join(", ") : data.Resolved_IPs;
-
-    let dkimHtml = "";
-    if(typeof data.DKIM.records === "string") {
-      dkimHtml = `<pre>${data.DKIM.records}</pre>`;
-    } else {
-      for(let selector in data.DKIM.records) {
-        let score = data.DKIM.scores[selector] || 0,
-            recs = data.DKIM.records[selector].join("\n");
-        dkimHtml += `<b>${selector} (Score: ${score})</b><br/><pre>${recs}</pre>
+  error.textContent=''; output.innerHTML=''; loading.style.display='block';
+  const domain=domainInput.value.trim();
+  if(!validateDomain(domain)) {loading.style.display='none';return error.textContent='Invalid domain';}
+  try{
+    const r=await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
+    loading.style.display='none';
+    const d=await r.json();
+    if(d.error)return error.textContent=d.error;
+    let spfRec = Array.isArray(d.SPF.records)?d.SPF.records.join("\n"):d.SPF.records;
+    let dmarcRec = Array.isArray(d.DMARC.records)?d.DMARC.records.join("\n"):d.DMARC.records;
+    let ips = Array.isArray(d.Resolved_IPs) ? d.Resolved_IPs.join(", ") : d.Resolved_IPs;
+    let dkimHtml="";
+    if(typeof d.DKIM.records==="string"){
+      dkimHtml=`<pre>${d.DKIM.records}</pre>`;
+    }else{
+      for(const s in d.DKIM.records){
+        let score=d.DKIM.scores[s]||0;
+        let recs=d.DKIM.records[s].join("\n");
+        dkimHtml+=`<b>${s} (Score: ${score})</b><br/><pre>${recs}</pre>
         <div class="score-bar"><div class="${scoreClass(score)}" style="width:${score}%;"></div></div>`;
       }
     }
-
-    output.innerHTML = `
-      <button class="copy-btn" onclick="copyOutput('output')">Copy</button>
-      <div class="output-box" id="output">
-        <b>Resolved IPs:</b> ${resolvedIPs}<br/><br/>
-        <b>SPF (Score: ${data.SPF.score}):</b><br/><pre>${spfRecords}</pre>
-        <div class="score-bar"><div class="${scoreClass(data.SPF.score)}" style="width:${data.SPF.score}%;"></div></div>
-
-        <b>DMARC (Score: ${data.DMARC.score}):</b><br/><pre>${dmarcRecords}</pre>
-        <div class="score-bar"><div class="${scoreClass(data.DMARC.score)}" style="width:${data.DMARC.score}%;"></div></div>
-
-        <b>DKIM:</b><br/>${dkimHtml}
-      </div>
-    `;
-  } catch(err) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').textContent = 'Error: ' + err.message;
-  }
+    output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
+    <div class="output-box" id="output">
+      <b>Resolved IPs:</b> ${ips}<br/><br/>
+      <b>SPF (Score: ${d.SPF.score}):</b><br/><pre>${spfRec}</pre>
+      <div class="score-bar"><div class="${scoreClass(d.SPF.score)}" style="width:${d.SPF.score}%;"></div></div>
+      <b>DMARC (Score: ${d.DMARC.score}):</b><br/><pre>${dmarcRec}</pre>
+      <div class="score-bar"><div class="${scoreClass(d.DMARC.score)}" style="width:${d.DMARC.score}%;"></div></div>
+      <b>DKIM:</b><br/>${dkimHtml}
+    </div>`;
+  }catch(e){loading.style.display='none'; error.textContent=e;}
 }
 
+// ===== AbuseIPDB =====
 async function runAbuseIPDB(){
-  document.getElementById('errorAbuse').textContent = '';
-  const outputAbuse = document.getElementById('outputAbuse');
-  outputAbuse.innerHTML = '';
-  document.getElementById('loadingAbuse').style.display = 'block';
-
-  const ip = document.getElementById('abuseIpInput').value.trim();
-  if(!validateIPv4(ip)) {
-    document.getElementById('loadingAbuse').style.display = 'none';
-    document.getElementById('errorAbuse').textContent = 'Invalid IPv4 address.';
-    return;
-  }
-
-  try {
-    const resp = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
-    const data = await resp.json();
-    document.getElementById('loadingAbuse').style.display = 'none';
-
-    if(data.error) {
-      document.getElementById('errorAbuse').textContent = data.error;
-      return;
-    }
-
-    outputAbuse.innerHTML = `
-      <button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
-      <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(data, null, 2)}</pre></div>
-    `;
-  } catch(err) {
-    document.getElementById('loadingAbuse').style.display = 'none';
-    document.getElementById('errorAbuse').textContent = 'Error: ' + err.message;
-  }
+  errorAbuse.textContent=''; outputAbuse.innerHTML=''; loadingAbuse.style.display='block';
+  const ip=abuseIpInput.value.trim();
+  if(!validateIPv4(ip)) {loadingAbuse.style.display='none';return errorAbuse.textContent='Invalid IPv4';}
+  try{
+    const r=await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
+    loadingAbuse.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorAbuse.textContent=d.error;
+    outputAbuse.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
+    <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingAbuse.style.display='none'; errorAbuse.textContent=e;}
 }
 
+// ===== Subfinder =====
 async function runSubfinder(){
-  document.getElementById('errorSubfinder').textContent = '';
-  const outputSubfinder = document.getElementById('outputSubfinder');
-  outputSubfinder.innerHTML = '';
-  document.getElementById('loadingSubfinder').style.display = 'block';
-
-  const domain = document.getElementById('subfinderDomainInput').value.trim();
-  if(!validateDomain(domain)) {
-    document.getElementById('loadingSubfinder').style.display = 'none';
-    document.getElementById('errorSubfinder').textContent = 'Invalid domain.';
-    return;
-  }
-
-  try {
-    const resp = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(domain)}`);
-    const data = await resp.json();
-    document.getElementById('loadingSubfinder').style.display = 'none';
-
-    if(data.error) {
-      document.getElementById('errorSubfinder').textContent = 'Error: ' + data.error;
-      return;
-    }
-
-    outputSubfinder.innerHTML = `
-      <button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
-      <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(data, null, 2)}</pre></div>
-    `;
-  } catch(err) {
-    document.getElementById('loadingSubfinder').style.display = 'none';
-    document.getElementById('errorSubfinder').textContent = 'Error: ' + err.message;
-  }
+  errorSubfinder.textContent=''; outputSubfinder.innerHTML=''; loadingSubfinder.style.display='block';
+  const dom=subfinderDomainInput.value.trim();
+  if(!validateDomain(dom)) {loadingSubfinder.style.display='none';return errorSubfinder.textContent='Invalid domain';}
+  try{
+    const r=await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
+    loadingSubfinder.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorSubfinder.textContent="Error: "+d.error;
+    outputSubfinder.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
+    <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingSubfinder.style.display='none'; errorSubfinder.textContent=e;}
 }
 
+// ===== Shodan =====
 async function runShodanIp(){
-  document.getElementById('errorShodan').textContent = '';
-  const outputShodan = document.getElementById('outputShodan');
-  outputShodan.innerHTML = '';
-  document.getElementById('loadingShodan').style.display = 'block';
-
-  const ip = document.getElementById('shodanIpInput').value.trim();
-  if(!validateIPv4(ip)) {
-    document.getElementById('loadingShodan').style.display = 'none';
-    document.getElementById('errorShodan').textContent = 'Invalid IPv4 address.';
-    return;
-  }
-
-  try {
-    const resp = await fetch(`/api/shodan_ip?ip=${encodeURIComponent(ip)}`);
-    const data = await resp.json();
-    document.getElementById('loadingShodan').style.display = 'none';
-
-    if(data.error) {
-      document.getElementById('errorShodan').textContent = data.error;
-      return;
-    }
-
-    outputShodan.innerHTML = `
-      <button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
-      <div class="output-box" id="outputShodan"><pre>${JSON.stringify(data, null, 2)}</pre></div>
-    `;
-  } catch(err) {
-    document.getElementById('loadingShodan').style.display = 'none';
-    document.getElementById('errorShodan').textContent = 'Error: ' + err.message;
-  }
+  errorShodan.textContent=''; outputShodan.innerHTML=''; loadingShodan.style.display='block';
+  const ip=shodanIpInput.value.trim();
+  if(!validateIPv4(ip)) {loadingShodan.style.display='none';return errorShodan.textContent='Invalid IPv4';}
+  try{
+    const r=await fetch(`/api/shodan_ip?ip=${encodeURIComponent(ip)}`);
+    loadingShodan.style.display='none';
+    const d=await r.json();
+    if(d.error)return errorShodan.textContent=d.error;
+    outputShodan.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
+      <div class="output-box" id="outputShodan"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+  }catch(e){loadingShodan.style.display='none'; errorShodan.textContent=e;}
 }
 </script>
 
