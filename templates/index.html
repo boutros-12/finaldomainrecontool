@@ -64,49 +64,103 @@ function validateIPv4(ip){return /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|
 function copyOutput(id){navigator.clipboard.writeText(document.getElementById(id).innerText);alert("Copied to clipboard!");}
 
 async function runRecon(){
-  error.textContent=''; output.innerHTML=''; loading.style.display='block';
-  const v=domainInput.value.trim(); if(!validateDomain(v)) return error.textContent='Invalid domain';
-  try{
-    const r=await fetch(`/api/recon?domain=${encodeURIComponent(v)}`);
-    loading.style.display='none'; const d=await r.json();
-    if(d.WHOIS && d.WHOIS.formatted_text) { d.WHOIS.formatted_text = d.WHOIS.formatted_text; }
-    output.innerHTML=`<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
-  }catch(e){loading.style.display='none'; error.textContent=e;}
+  error.textContent = ''; output.innerHTML = ''; loading.style.display = 'block';
+  const domain = domainInput.value.trim();
+  if(!validateDomain(domain)) {
+    loading.style.display = 'none';
+    return error.textContent = 'Invalid domain';
+  }
+  try {
+    const resp = await fetch(`/api/recon?domain=${encodeURIComponent(domain)}`);
+    loading.style.display = 'none';
+    const data = await resp.json();
+    if(data.error) {
+      error.textContent = data.error;
+      return;
+    }
+    // Display SPF, DMARC, DKIM nicely
+    output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
+      <div class="output-box" id="output">
+        <b>SPF:</b><pre>${JSON.stringify(data.SPF, null, 2)}</pre>
+        <b>DMARC:</b><pre>${JSON.stringify(data.DMARC, null, 2)}</pre>
+        <b>DKIM:</b><pre>${JSON.stringify(data.DKIM, null, 2)}</pre>
+      </div>`;
+  } catch(e) {
+    loading.style.display = 'none';
+    error.textContent = e;
+  }
 }
 
-async function runIpinfo(){
-  errorIpinfo.textContent=''; outputIpinfo.innerHTML=''; loadingIpinfo.style.display='block';
-  const ip=ipinfoInput.value.trim(); if(!validateIPv4(ip)) return errorIpinfo.textContent='Invalid IPv4';
-  try{
-    const r=await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
-    loadingIpinfo.style.display='none'; const d=await r.json();
-    outputIpinfo.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
-  }catch(e){loadingIpinfo.style.display='none'; errorIpinfo.textContent=e;}
+async function runIpinfo() {
+  errorIpinfo.textContent = ''; outputIpinfo.innerHTML = ''; loadingIpinfo.style.display = 'block';
+  const ip = ipinfoInput.value.trim();
+  if(!validateIPv4(ip)) {
+    loadingIpinfo.style.display = 'none';
+    return errorIpinfo.textContent = 'Invalid IPv4';
+  }
+  try {
+    const resp = await fetch(`/api/ipinfo_ip?ip=${encodeURIComponent(ip)}`);
+    loadingIpinfo.style.display = 'none';
+    const data = await resp.json();
+    if(data.error) {
+      errorIpinfo.textContent = data.error;
+      return;
+    }
+    outputIpinfo.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputIpinfo')">Copy</button>
+      <div class="output-box" id="outputIpinfo"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+  } catch(e) {
+    loadingIpinfo.style.display = 'none';
+    errorIpinfo.textContent = e;
+  }
 }
 
-async function runAbuseIPDB(){
-  errorAbuse.textContent=''; outputAbuse.innerHTML=''; loadingAbuse.style.display='block';
-  const ip=abuseIpInput.value.trim(); if(!validateIPv4(ip)) return errorAbuse.textContent='Invalid IPv4';
-  try{
-    const r=await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
-    loadingAbuse.style.display='none'; const d=await r.json();
-    outputAbuse.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
-  }catch(e){loadingAbuse.style.display='none'; errorAbuse.textContent=e;}
+async function runAbuseIPDB() {
+  errorAbuse.textContent = ''; outputAbuse.innerHTML = ''; loadingAbuse.style.display = 'block';
+  const ip = abuseIpInput.value.trim();
+  if(!validateIPv4(ip)) {
+    loadingAbuse.style.display = 'none';
+    return errorAbuse.textContent = 'Invalid IPv4';
+  }
+  try {
+    const resp = await fetch(`/api/abuseipdb_ip?ip=${encodeURIComponent(ip)}`);
+    loadingAbuse.style.display = 'none';
+    const data = await resp.json();
+    if(data.error) {
+      errorAbuse.textContent = data.error;
+      return;
+    }
+    outputAbuse.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputAbuse')">Copy</button>
+      <div class="output-box" id="outputAbuse"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+  } catch(e) {
+    loadingAbuse.style.display = 'none';
+    errorAbuse.textContent = e;
+  }
 }
 
-async function runSubfinder(){
-  errorSubfinder.textContent=''; outputSubfinder.innerHTML=''; loadingSubfinder.style.display='block';
-  const dom=subfinderDomainInput.value.trim(); if(!validateDomain(dom)) return errorSubfinder.textContent='Invalid domain';
-  try{
-    const r=await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
-    loadingSubfinder.style.display='none'; const d=await r.json();
-    outputSubfinder.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
-    <div class="output-box"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
-  }catch(e){loadingSubfinder.style.display='none'; errorSubfinder.textContent=e;}
+async function runSubfinder() {
+  errorSubfinder.textContent = ''; outputSubfinder.innerHTML = ''; loadingSubfinder.style.display = 'block';
+  const dom = subfinderDomainInput.value.trim();
+  if(!validateDomain(dom)) {
+    loadingSubfinder.style.display = 'none';
+    return errorSubfinder.textContent = 'Invalid domain';
+  }
+  try {
+    const resp = await fetch(`/api/subdomain_scan?domain=${encodeURIComponent(dom)}`);
+    loadingSubfinder.style.display = 'none';
+    const data = await resp.json();
+    if(data.error) {
+      errorSubfinder.textContent = "Error: " + data.error;
+      outputSubfinder.innerHTML = '';
+      return;
+    }
+    outputSubfinder.innerHTML = `<button class="copy-btn" onclick="copyOutput('outputSubfinder')">Copy</button>
+      <div class="output-box" id="outputSubfinder"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+  } catch(e) {
+    loadingSubfinder.style.display = 'none';
+    errorSubfinder.textContent = e;
+  }
 }
 </script>
+
 </body>
 </html>
