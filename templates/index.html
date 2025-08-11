@@ -23,9 +23,11 @@
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup</h3>
-<small>Gets DNS, SPF, DKIM, DMARC, WHOIS, SSL, DNSSEC, HTTP headers</small><br/>
+<!-- Updated subtitle -->
+<small>Gets SPF, DKIM, and DMARC records for the domain</small><br/>
 <input id="domainInput" placeholder="example.com" onkeypress="if(event.key==='Enter') runRecon()" />
-<button onclick="runRecon()">Run Recon</button>
+<!-- Updated button text -->
+<button onclick="runRecon()">Check SPF / DKIM / DMARC</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
 <div id="output"></div>
@@ -78,7 +80,6 @@ async function runRecon(){
       error.textContent = data.error;
       return;
     }
-    // Display SPF, DMARC, DKIM nicely
     output.innerHTML = `<button class="copy-btn" onclick="copyOutput('output')">Copy</button>
       <div class="output-box" id="output">
         <b>SPF:</b><pre>${JSON.stringify(data.SPF, null, 2)}</pre>
