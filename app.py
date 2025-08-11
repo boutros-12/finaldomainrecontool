@@ -5,11 +5,11 @@ import shodan
 app = Flask(__name__)
 
 # === API Keys ===
-ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "Ok0alLl8r0kjNjyM0qIArF2mediolsf4"
+ABUSEIPDB_API_KEY = "YOUR_ABUSEIPDB_API_KEY"
+SHODAN_API_KEY = "YOUR_SHODAN_API_KEY"
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
-# Common DKIM selectors (add more if needed)
+# === Common DKIM selectors to check ===
 COMMON_DKIM_SELECTORS = ["selector1", "selector2", "default", "google", "k1"]
 
 # === DNS Helpers ===
@@ -28,21 +28,23 @@ def resolve_domain_to_ips(domain):
 def get_mx_records(domain):
     try:
         answers = dns.resolver.resolve(domain, 'MX')
-        records = []
-        for rdata in answers:
-            records.append(f"{rdata.preference} {rdata.exchange.to_text()}")
-        return records
+        return [f"{r.preference} {r.exchange.to_text()}" for r in answers]
     except Exception:
         return []
 
-# === Thread helper ===
+# === Thread wrapper ===
 def threaded(fn):
     def wrapper(*args, **kwargs):
         result = {}
         def run():
-            try: result['data'] = fn(*args, **kwargs)
-            except Exception as e: result['data'] = {"error": str(e)}
-        t = threading.Thread(target=run); t.daemon = True; t.start(); t.join(timeout=55)
+            try:
+                result['data'] = fn(*args, **kwargs)
+            except Exception as e:
+                result['data'] = {"error": str(e)}
+        t = threading.Thread(target=run)
+        t.daemon = True
+        t.start()
+        t.join(timeout=55)
         return result.get('data', {"error": "Timed out"})
     return wrapper
 
@@ -52,8 +54,10 @@ def extract_dkim_key_length(lst):
         record = ''.join(part.strip('"') for part in txt.split())
         m = re.search(r'p=([A-Za-z0-9+/=]+)', record)
         if m:
-            try: return len(base64.b64decode(m.group(1))) * 8
-            except Exception: return 0
+            try:
+                return len(base64.b64decode(m.group(1))) * 8
+            except Exception:
+                return 0
     return 0
 
 def score_dkim(lst):
@@ -85,19 +89,19 @@ def score_spf(lst):
             else: return 50
     return 0
 
-# === Recon route with MX and improved DKIM ===
+# === /api/recon with MX + DKIM scan ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
-    if not domain: return jsonify({"error":"Please provide a domain"}), 400
-    
+    if not domain:
+        return jsonify({"error":"Please provide a domain"}), 400
+
     SPF = [t for t in get_txt_records(domain) if 'v=spf1' in t.lower()]
     DMARC = get_txt_records(f"_dmarc.{domain}")
     MX = get_mx_records(domain)
     IPs = resolve_domain_to_ips(domain) or "No A records"
 
-    dkim_recs = {}
-    dkim_scores = {}
+    dkim_recs, dkim_scores = {}, {}
     for sel in COMMON_DKIM_SELECTORS:
         recs = get_txt_records(f"{sel}._domainkey.{domain}")
         if recs:
@@ -123,14 +127,16 @@ def api_abuseipdb_ip():
             params={"ipAddress":ip, "maxAgeInDays":"90"}, timeout=15)
         r.raise_for_status()
         return r.json()
-    except Exception as e: return {"error": str(e)}
+    except Exception as e:
+        return {"error": str(e)}
 
 # === Subfinder ===
 def subfinder_scan(domain):
     try:
         p = subprocess.run(shlex.split(f"subfinder -d {shlex.quote(domain)} -silent -oJ -"),
                            capture_output=True, text=True, timeout=60)
-        if p.returncode != 0: return {"error": p.stderr.strip()}
+        if p.returncode != 0:
+            return {"error": p.stderr.strip()}
         subs = []
         for line in p.stdout.splitlines():
             if line.strip():
@@ -141,19 +147,22 @@ def subfinder_scan(domain):
         return {"domain": domain, "subdomains": subs}
     except subprocess.TimeoutExpired:
         return {"error": "Subfinder timed out"}
-    except Exception as e: return {"error": str(e)}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.route('/api/subdomain_scan')
 def api_subdomain_scan():
     domain = request.args.get('domain')
-    if not domain: return jsonify({"error":"Please provide a domain"}), 400
+    if not domain:
+        return jsonify({"error":"Please provide a domain"}), 400
     return jsonify(threaded(subfinder_scan)(domain))
 
-# === Shodan Lookup (keeps 403 errors visible) ===
+# === Shodan lookup with 403 error shown ===
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
-    if not ip: return jsonify({"error":"Please provide IP address"}), 400
+    if not ip:
+        return jsonify({"error":"Please provide IP address"}), 400
     try:
         return jsonify(shodan_api.host(ip))
     except shodan.APIError as e:
@@ -162,7 +171,8 @@ def api_shodan_ip():
         return jsonify({"error": str(e)})
 
 @app.route('/')
-def index(): return render_template('index.html')
+def index():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
