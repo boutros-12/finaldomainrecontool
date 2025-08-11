@@ -13,6 +13,9 @@ button{background:#007BFF;color:white;border:none;cursor:pointer;}
 .error{color:red;margin-top:5px;}
 .loading{display:none;color:#555;}
 .output-box{background:#f8f8f8;border:1px solid #ccc;padding:10px;margin-top:10px;white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto;}
+.Excellent{color:green;font-weight:bold;}
+.Medium{color:orange;font-weight:bold;}
+.Poor{color:red;font-weight:bold;}
 </style>
 </head>
 <body>
@@ -20,7 +23,7 @@ button{background:#007BFF;color:white;border:none;cursor:pointer;}
 <h1>Domain Reconnaissance Tool</h1>
 
 <h3>Domain Lookup (SPF / DKIM / DMARC / IPs)</h3>
-<input id="domainInput" placeholder="example.com or example.com:selector1" onkeypress="if(event.key==='Enter') runRecon()"/>
+<input id="domainInput" placeholder="example.com or example.com:selector" onkeypress="if(event.key==='Enter') runRecon()"/>
 <button onclick="runRecon()">Check Records and Scores</button>
 <div id="loading" class="loading">Loading...</div>
 <div id="error" class="error"></div>
@@ -66,7 +69,7 @@ async function runRecon(){
   const inputVal = domainInput.value.trim();
   if(!validateDomainOrSelector(inputVal)){
     loading.style.display='none'; 
-    return error.textContent='Invalid domain or selector format. Example: example.com or example.com:selector1';
+    return error.textContent='Invalid domain format. Example: example.com';
   }
   let domain = inputVal;
   let selector = null;
@@ -81,10 +84,16 @@ async function runRecon(){
 
   let outHtml = `<div class="output-box"><strong>Resolved IPs:</strong> ${JSON.stringify(data.Resolved_IPs)}<br><br>`;
 
-  outHtml += `<strong>SPF Records:</strong> ${JSON.stringify(data.SPF.records)}<br>SPF Score: ${data.SPF.score}<br><br>`;
-  outHtml += `<strong>DMARC Records:</strong> ${JSON.stringify(data.DMARC.records)}<br>DMARC Score: ${data.DMARC.score}<br><br>`;
-  outHtml += `<strong>DKIM Records:</strong> ${JSON.stringify(data.DKIM.records)}<br>DKIM Scores: ${JSON.stringify(data.DKIM.scores)}<br><br>`;
-  outHtml += `<strong>Aggregate Email Security Score:</strong> ${data.Aggregate_Email_Security_Score}</div>`;
+  outHtml += `<strong>SPF Records:</strong> ${JSON.stringify(data.SPF.records)}<br>`;
+  outHtml += `SPF Score: ${data.SPF.score} <span class="${data.SPF.label}">(${data.SPF.label})</span><br><br>`;
+
+  outHtml += `<strong>DMARC Records:</strong> ${JSON.stringify(data.DMARC.records)}<br>`;
+  outHtml += `DMARC Score: ${data.DMARC.score} <span class="${data.DMARC.label}">(${data.DMARC.label})</span><br><br>`;
+
+  outHtml += `<strong>DKIM Records:</strong> ${JSON.stringify(data.DKIM.records)}<br>`;
+  outHtml += `DKIM Scores: ${JSON.stringify(data.DKIM.scores)}<br><br>`;
+
+  outHtml += `<strong>Aggregate Email Security Score:</strong> ${data.Aggregate_Email_Security_Score} <span class="${data.Aggregate_Label}">(${data.Aggregate_Label})</span></div>`;
   output.innerHTML = outHtml;
 }
 

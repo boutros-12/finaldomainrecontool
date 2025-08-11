@@ -12,8 +12,8 @@ import base64
 app = Flask(__name__)
 
 # === API Keys ===
-ABUSEIPDB_API_KEY = "PUT-YOUR-ABUSEIPDB-KEY-HERE"
-SHODAN_API_KEY = "PUT-YOUR-SHODAN-KEY-HERE"
+ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
+SHODAN_API_KEY = "rnR7ElQ4zex2TyQ7XOdwayepytPCLY58"
 
 # Shodan API client
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
@@ -95,11 +95,19 @@ def score_spf(spf_txt_list):
             else: return 50
     return 0
 
+def score_label(score):
+    if score >= 85:
+        return "Excellent"
+    elif score >= 50:
+        return "Medium"
+    else:
+        return "Poor"
+
 # === Recon endpoint ===
 @app.route("/api/recon")
 def api_recon():
     domain = request.args.get('domain')
-    selector = request.args.get('selector')
+    selector = request.args.get('selector')  # optional
     if not domain:
         return jsonify({"error":"Please provide a domain"}), 400
 
@@ -109,10 +117,13 @@ def api_recon():
     dkim_selectors = {}
     dkim_scores = {}
 
-    candidates = [selector] if selector else ["default", "selector1", "selector2", "google"]
+    if selector:
+        candidates = [selector]
+    else:
+        candidates = ["default", "selector1", "selector2", "google"]
+
     for sel in candidates:
-        dkim_domain = f"{sel}._domainkey.{domain}"
-        recs = get_txt_records(dkim_domain)
+        recs = get_txt_records(f"{sel}._domainkey.{domain}")
         if recs:
             dkim_selectors[sel] = recs
             dkim_scores[sel] = score_dkim(recs)
@@ -122,14 +133,16 @@ def api_recon():
     dkim_avg_score = sum(dkim_scores.values()) / len(dkim_scores) if dkim_scores else 0
 
     aggregate_score = int(0.4 * dmarc_score + 0.3 * spf_score + 0.3 * dkim_avg_score)
+
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
         "Resolved_IPs": resolved_ips,
-        "SPF": {"records": SPF_records or "No SPF record", "score": spf_score},
-        "DMARC": {"records": DMARC_records or "No DMARC record", "score": dmarc_score},
+        "SPF": {"records": SPF_records or "No SPF record", "score": spf_score, "label": score_label(spf_score)},
+        "DMARC": {"records": DMARC_records or "No DMARC record", "score": dmarc_score, "label": score_label(dmarc_score)},
         "DKIM": {"records": dkim_selectors or "No DKIM found", "scores": dkim_scores},
-        "Aggregate_Email_Security_Score": aggregate_score
+        "Aggregate_Email_Security_Score": aggregate_score,
+        "Aggregate_Label": score_label(aggregate_score)
     })
 
 # === AbuseIPDB API ===
