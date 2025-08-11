@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "bMpyV5fA7JuWQJ6kyTexU9kEwgFqog9F"
+SHODAN_API_KEY = "ezFDoLAioWWII7RtYaA8xDXy2316qc8x"
 
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
@@ -137,9 +137,7 @@ def api_recon():
     dmarc_score = score_dmarc(DMARC_records)
     dkim_avg_score = sum(dkim_scores.values()) / len(dkim_scores) if dkim_scores else 0
 
-    # Total combined security score
     total_score = round((spf_score + dmarc_score + dkim_avg_score) / 3)
-
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
@@ -205,6 +203,19 @@ def api_shodan_ip():
         return jsonify({"error": "Please provide IP address"}), 400
     try:
         result = shodan_api.host(ip)
+        cf_protect = False
+        cf_message = ""
+        for item in result.get('data', []):
+            http_data = item.get('http', {})
+            if 'server' in http_data and 'cloudflare' in http_data['server'].lower():
+                html_content = http_data.get('html', '').lower()
+                if 'direct ip access not allowed' in html_content or 'error 1003' in html_content:
+                    cf_protect = True
+                    cf_message = "Note: This IP is protected by Cloudflare. Some scan results may be limited."
+                    break
+        if cf_protect:
+            result['cloudflare_protection'] = True
+            result['cloudflare_message'] = cf_message
         return jsonify(result)
     except shodan.APIError as e:
         return {"error": f"Shodan API error: {str(e)}"}

@@ -146,8 +146,17 @@ async function runShodanIp(){
     loadingShodan.style.display='none';
     const d=await r.json();
     if(d.error)return errorShodan.textContent=d.error;
+
+    let warningHtml="";
+    if(d.cloudflare_protection){
+      warningHtml=`<div style="padding:10px; border:1px solid #f39c12; background:#fdf5e6; color:#b36b00; margin-bottom: 10px; font-weight: bold;">
+        ⚠️ ${d.cloudflare_message}
+      </div>`;
+    }
+
     outputShodan.innerHTML=`<button class="copy-btn" onclick="copyOutput('outputShodan')">Copy</button>
-    <div class="output-box" id="outputShodan"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
+      ${warningHtml}
+      <div class="output-box" id="outputShodan"><pre>${JSON.stringify(d,null,2)}</pre></div>`;
   }catch(e){loadingShodan.style.display='none'; errorShodan.textContent=e;}
 }
 </script>
