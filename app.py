@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # === API Keys ===
 ABUSEIPDB_API_KEY = "4e58e37738104cd8ecbf10f5059e1fdeff0291e1b12243cc859d765bc450b951021ddd088c905a36"
-SHODAN_API_KEY = "Ok0alLl8r0kjNjyM0qIArF2mediolsf4"
+SHODAN_API_KEY = "g64zigVr0zv9B6ZZ0sYvxu48q0runWUn"
 
 shodan_api = shodan.Shodan(SHODAN_API_KEY)
 
@@ -50,6 +50,15 @@ def threaded(fn):
         return result.get('data', {"error": "Timed out"})
     return wrapper
 
+# === WHOIS ===
+def whois_lookup(domain):
+    try:
+        return whois.whois(domain)
+    except Exception as e:
+        return {"error": str(e)}
+
+threaded_whois = threaded(whois_lookup)
+
 # === Scoring Helpers ===
 def extract_dkim_key_length(dkim_txt_list):
     for txt in dkim_txt_list:
@@ -71,7 +80,8 @@ def score_dkim(dkim_txt_list):
         return 70
     elif key_len > 0:
         return 50
-    return 0
+    else:
+        return 0
 
 def score_dmarc(dmarc_txt_list):
     if not dmarc_txt_list:
@@ -105,7 +115,7 @@ def score_spf(spf_txt_list):
                 return 50
     return 0
 
-# === API Route for reconnaissance ===
+# === API Route for reconnaissance (SPF, DMARC, DKIM, IPs, scoring) ===
 @app.route('/api/recon')
 def api_recon():
     domain = request.args.get('domain')
@@ -125,6 +135,7 @@ def api_recon():
 
     spf_score = score_spf(SPF_records)
     dmarc_score = score_dmarc(DMARC_records)
+
     resolved_ips = resolve_domain_to_ips(domain) or "No A records"
 
     return jsonify({
@@ -134,7 +145,7 @@ def api_recon():
         "DKIM": {"records": dkim_selectors or "No DKIM found", "scores": dkim_scores}
     })
 
-# === AbuseIPDB Lookup ===
+# === AbuseIPDB route ===
 @app.route('/api/abuseipdb_ip')
 def api_abuseipdb_ip():
     ip = request.args.get('ip')
@@ -150,7 +161,7 @@ def api_abuseipdb_ip():
     except Exception as e:
         return {"error": str(e)}
 
-# === Subfinder Scan ===
+# === Subfinder scan ===
 def subfinder_scan(domain):
     try:
         cmd = f"subfinder -d {shlex.quote(domain)} -silent -oJ -"
@@ -181,7 +192,7 @@ def api_subdomain_scan():
         return jsonify({"error": "Please provide a domain"}), 400
     return jsonify(threaded_subfinder(domain))
 
-# === Shodan Lookup ===
+# === Shodan route without advanced Cloudflare detection ===
 @app.route('/api/shodan_ip')
 def api_shodan_ip():
     ip = request.args.get('ip')
